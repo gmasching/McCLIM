@@ -1,6 +1,6 @@
 
 ;;;  (c) copyright 1998,1999,2000 by Michael McDonald (mikemac@mikemac.com)
-;;;  (c) copyright 2000, 2014 by 
+;;;  (c) copyright 2000, 2014 by
 ;;;           Robert Strandh (robert.strandh@gmail.com)
 ;;;  (c) copyright 2005 by
 ;;;           Andreas Fuchs (asf@boinkor.net)
@@ -16,8 +16,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 ;;; The actual McCLIM system that people should to use in their ASDF
@@ -65,10 +65,11 @@ interface management system."
 ;;; platform.
 (defsystem #:mcclim/looks
   :depends-on (#:clim
-               #-(or mcclim-beagle mcclim-ugly)
+               #-(or mcclim-beagle mcclim-ugly mezzano)
                                 #:mcclim-clx/pretty  #| adds truetype        |#
                #+mcclim-ugly    #:mcclim-clx         #| raw clim-clx backend |#
                #+mcclim-beagle  #:mcclim-beagle      #| OSX native (clozure) |#
+               #+mezzano        #:mcclim-mezzano     #| Mezzano (a LISP OS)  |#
 
                ;; null backend
                #:mcclim-null))
@@ -87,4 +88,4 @@ interface management system."
 ;; The fact that our CLIM implementation is McCLIM is already true now.
 ;; This feature is notably used by ESA and DREI, in cases where they need to
 ;; know whether they are compiled with McCLIM or another CLIM implementation.
-(pushnew :mcclim *features*) 
+(pushnew :mcclim *features*)

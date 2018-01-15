@@ -25,12 +25,13 @@
            '(#p"/usr/share/fonts/truetype/ttf-dejavu/"
              #p"/usr/share/fonts/truetype/dejavu/"
              #p"/usr/share/fonts/TTF/"
+             #p"/usr/share/fonts/dejavu/"
              #p"/usr/share/fonts/"
              #p"/usr/local/share/fonts/dejavu/"
              #p"/usr/X11R6/lib/X11/fonts/TTF/"
              #p"/opt/X11/share/fonts/TTF/"
              #p"/opt/X11/share/fonts/"
-             #p"C:/Windows/Fonts/")))
+             #-mezzano #p"C:/Windows/Fonts/")))
 
 ;;; Here are mappings for the DejaVu family of fonts, which are a
 ;;; derivative of Vera with improved unicode coverage.
@@ -140,12 +141,12 @@
 	(with-input-from-string (stream output)
 	  (parse-fontconfig-output stream)))))
 
-(defun fontconfig-name (family face) 
+(defun fontconfig-name (family face)
   (format nil "~A:~A" family face))
 
 (defun build-font/family-map (&optional (families *family-names*))
   (loop for family in families nconcing
-    (loop for face in *fontconfig-faces* 
+    (loop for face in *fontconfig-faces*
           as filename = (find-fontconfig-font (fontconfig-name (cdr family) (cdr face)))
           when (null filename) do (return-from build-font/family-map nil)
           collect

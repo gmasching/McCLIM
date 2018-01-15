@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp; Package: CLIM-INTERNALS -*-
 
 ;;;  (c) copyright 1998,1999,2000,2001 by Michael McDonald (mikemac@mikemac.com)
-;;;  (c) copyright 2000 by 
+;;;  (c) copyright 2000 by
 ;;;           Iban Hatchondo (hatchond@emi.u-bordeaux.fr)
 ;;;           Julien Boninfante (boninfan@emi.u-bordeaux.fr)
 ;;;  (c) copyright 2000, 2014 by
@@ -34,7 +34,7 @@
 ;;;   default.  Put it after CLX, so that it won't actually be
 ;;;   reached.
 (defvar *server-path-search-order*
-    '(:beagle :clx :null))
+    '(:beagle :mezzano :clx :null))
 
 (defun find-default-server-path ()
   (loop for port in *server-path-search-order*
@@ -75,12 +75,12 @@
 
 (defmethod port-keyboard-input-focus (port)
   (when (null *application-frame*)
-    (error "~S called with null ~S" 
+    (error "~S called with null ~S"
            'port-keyboard-input-focus '*application-frame*))
   (port-frame-keyboard-input-focus port *application-frame*))
 (defmethod (setf port-keyboard-input-focus) (focus port)
   (when (null *application-frame*)
-    (error "~S called with null ~S" 
+    (error "~S called with null ~S"
            '(setf port-keyboard-input-focus) '*application-frame*))
   (unless (eq *application-frame* (pane-frame focus))
     (error "frame mismatch in ~S" '(setf port-keyboard-input-focus)))
@@ -278,7 +278,7 @@
 
 
 (defgeneric port-force-output (port)
-  (:documentation "Flush the output buffer of PORT, if there is one.")) 
+  (:documentation "Flush the output buffer of PORT, if there is one."))
 
 (defmethod port-force-output ((port basic-port))
   (values))
