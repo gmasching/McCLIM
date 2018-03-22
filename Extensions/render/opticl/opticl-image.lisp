@@ -1,5 +1,7 @@
 (in-package :mcclim-render-internals)
 
+#+mezzano(declaim (optimize (speed 3) (safety 0) (debug 1)))
+
 ;;;
 ;;; Opticl
 ;;;
