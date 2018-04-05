@@ -66,9 +66,11 @@ interface management system."
 (defsystem #:mcclim/looks
   :depends-on (#:clim
                #-(or mcclim-beagle mcclim-ugly mezzano)
-                                #:mcclim-clx/pretty  #| adds truetype        |#
-               #+mcclim-ugly    #:mcclim-clx         #| raw clim-clx backend |#
-               #+mcclim-beagle  #:mcclim-beagle      #| OSX native (clozure) |#
+               #:mcclim-clx/pretty              #| adds truetype        |#
+               #+mcclim-ugly #:mcclim-clx       #| raw clim-clx backend |#
+               #-(or mcclim-beagle mezzano)
+               #:mcclim-clx-fb  #| experimental backend |#
+               #+mcclim-beagle #:mcclim-beagle  #| OSX native (clozure) |#
                #+mezzano        #:mcclim-mezzano     #| Mezzano (a LISP OS)  |#
 
                ;; null backend
