@@ -1,7 +1,6 @@
 (in-package :clim-mezzano)
 
 (defvar *port* NIL)
-(defvar *current-focus* NIL)
 
 ;;======================================================================
 ;; Define pointer class
@@ -123,7 +122,6 @@
 
 (defmethod (setf port-frame-keyboard-input-focus)
     (focus (port mezzano-port) frame)
-  (setf *current-focus* focus)
   (setf (frame-properties frame 'focus) focus))
 
 (defun create-mezzano-mirror (port sheet title width height top-border
@@ -274,7 +272,8 @@
 ;;; Pixmap
 
 (defmethod destroy-mirror ((port mezzano-port) (pixmap mcclim-render-internals:image-pixmap-mixin))
-  (call-next-method))
+  (when (port-lookup-mirror port pixmap)
+    (port-unregister-mirror port pixmap (port-lookup-mirror port pixmap))))
 
 (defmethod realize-mirror ((port mezzano-port) (pixmap image-pixmap-mixin))
   (setf (sheet-parent pixmap) (graft port))

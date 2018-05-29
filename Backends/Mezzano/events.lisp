@@ -58,19 +58,23 @@
   (let* ((releasep (mos:key-releasep event))
          (char (mos:key-key event))
          (name (get-name char))
-         (modifier-state (compute-modifier-state (mos:key-modifier-state event))))
-    (mos:fifo-push
-     (make-instance (if releasep 'key-release-event 'key-press-event)
-                    :key-name name
-                    :key-character char
-                    :x *last-mouse-x*
-                    :y *last-mouse-y*
-                    :graft-x *last-graft-x*
-                    :graft-y *last-graft-y*
-                    :sheet *current-focus*
-                    :modifier-state modifier-state)
-     mcclim-fifo
-     nil)))
+         (modifier-state (compute-modifier-state (mos:key-modifier-state event)))
+         (mez-window (mos:window event))
+         (sheet (port-lookup-sheet *port* mez-window)))
+    (when sheet
+      (mos:fifo-push
+       (make-instance (if releasep 'key-release-event 'key-press-event)
+                      :key-name name
+                      :key-character char
+                      :x *last-mouse-x*
+                      :y *last-mouse-y*
+                      :graft-x *last-graft-x*
+                      :graft-y *last-graft-y*
+                      :sheet (or (frame-properties (pane-frame sheet) 'focus)
+                                 sheet)
+                      :modifier-state modifier-state)
+       mcclim-fifo
+       nil))))
 
 ;;;======================================================================
 ;;; Pointer Events
@@ -179,9 +183,9 @@
               *last-mouse-y* (- mouse-y dy)
               *last-graft-x* (+ mouse-x (mos:window-x mez-window))
               *last-graft-y* (+ mouse-y (mos:window-y mez-window)))
-        (cond ((or (null mez-frame)
-                   (mos:in-frame-header-p mez-frame mouse-x mouse-y)
-                   (mos:in-frame-border-p mez-frame mouse-x mouse-y))
+        (cond ((and mez-frame
+                    (or (mos:in-frame-header-p mez-frame mouse-x mouse-y)
+                        (mos:in-frame-border-p mez-frame mouse-x mouse-y)))
                (when *last-mouse-sheet*
                  (mouse-exit-event mcclim-fifo *last-mouse-sheet* event)
                  (setf *last-mouse-sheet* nil))
@@ -225,17 +229,18 @@
                         :timestamp 0
                         :sheet sheet
                         :region (make-rectangle* 0 0 width height)))
-       mcclim-fifo)
-      )
-    (setf *current-focus* focus)))
+       mcclim-fifo))))
 
 (defmethod mez-event->mcclim-event (mcclim-fifo (event mos:quit-event))
-  (mos:fifo-push
-   (make-instance 'window-destroy-event
-                  :sheet *current-focus*
-                  :region nil)
-   mcclim-fifo
-   nil))
+  (let* ((mez-window (mos:window event))
+         (sheet (port-lookup-sheet *port* mez-window)))
+    (when sheet
+      (mos:fifo-push
+       (make-instance 'window-destroy-event
+                      :sheet sheet
+                      :region nil)
+       mcclim-fifo
+       nil))))
 
 (defmethod mez-event->mcclim-event (mcclim-fifo (event mos:window-close-event))
   ;;; TODO - what needs to happen here anything?
