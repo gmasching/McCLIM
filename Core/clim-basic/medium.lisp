@@ -90,7 +90,7 @@
 (defun family-key (family)
   (ecase family
     ((nil) 0)
-    ((:fix :fixed) 1)
+    ((:fix) 1)
     ((:serif) 2)
     ((:sans-serif) 3)))
 
@@ -740,18 +740,6 @@
          (end-angle (ellipse-end-angle transformed-ellipse)))
     (multiple-value-bind (center-x center-y) (ellipse-center-point* transformed-ellipse)
       (call-next-method medium center-x center-y radius start-angle end-angle filled))))
-
-(defmethod medium-draw-text* :around ((medium transform-coordinates-mixin) string x y
-                                      start end
-                                      align-x align-y
-                                      toward-x toward-y transform-glyphs)
-  ;;!!! FIX ME!
-  (let ((tr (medium-transformation medium)))
-    (with-transformed-position (tr x y)
-      (call-next-method medium string x y
-                        start end
-                        align-x align-y
-                        toward-x toward-y transform-glyphs))))
 
 (defgeneric medium-draw-glyph
   (medium element x y align-x align-y toward-x toward-y transform-glyphs))
