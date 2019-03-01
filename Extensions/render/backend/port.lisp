@@ -18,15 +18,14 @@
   nil)
 
 ;;; realize/destroy mirrors
-(defmethod realize-mirror ((port render-port-mixin) (sheet image-sheet-mixin))
-    )
+(defmethod realize-mirror ((port render-port-mixin) (sheet image-sheet-mixin)))
 
 ;;;
 ;;; Fonts
 ;;;
 
-(defmethod text-style-to-font ((port render-port-mixin)
-			       (text-style standard-text-style))
+(defmethod climb:text-style-to-font ((port render-port-mixin) (text-style standard-text-style)
+                                     &aux (text-style (climb:parse-text-style* text-style)))
   (labels
       ((find-and-make-truetype-font (family face size)
          (let* ((font-path-maybe-relative
@@ -41,29 +40,22 @@
                                     font-path-maybe-relative
                                     (or *truetype-font-path* "")))))))
            (if (and font-path (probe-file font-path))
-	       (make-truetype-font port font-path size)
+               (make-truetype-font port font-path size)
                ;; We could error here, but we want to fallback to
                ;; fonts provided by CLX server. Its better to have
                ;; ugly fonts than none at all.
-	       (error 'missing-font
-		      :filename font-path
-		      :text-style text-style))))
+               (error 'missing-font
+                      :filename font-path
+                      :text-style text-style))))
        (find-font ()
-         (multiple-value-bind (family face size)
-             (clim:text-style-components text-style)
-
-           (setf face   (or face :roman)
-                 family (or family :fix)
-                 size   (or size :normal)
-		 size (getf *text-sizes* size size))
-
-           (find-and-make-truetype-font family face size))))
+         (multiple-value-call #'find-and-make-truetype-font
+           (clim:text-style-components text-style))))
     (or (text-style-mapping port text-style)
         (setf (climi::text-style-mapping port text-style)
               (or (find-truetype-font port text-style)
                   (invoke-with-truetype-path-restart #'find-font))))))
 
-(defmethod text-style-to-font ((port render-port-mixin) (gs-text-style cons))
+(defmethod climb:text-style-to-font ((port render-port-mixin) (gs-text-style cons))
   (text-style-to-font port (apply #'make-text-style gs-text-style)))
 
 (defmethod clim-internals::text-style-size ((gs-text-style cons))
@@ -81,12 +73,12 @@
       (font-cache        (make-hash-table :test #'equal))
       (text-style-cache  (make-hash-table :test #'equal)))
   (defun make-truetype-font (port filename size)
-    (climi::with-lock-held (*zpb-font-lock*)
+    (clim-sys:with-lock-held (*zpb-font-lock*)
       (let* ((loader (ensure-gethash filename font-loader-cache
                                      (zpb-ttf:open-font-loader filename)))
              (family-name (zpb-ttf:family-name loader))
              (family (ensure-gethash family-name font-families
-                                     (make-instance 'truetype-font-family
+                                     (make-instance 'mcclim-truetype::truetype-font-family
                                                     :port port
                                                     :name (zpb-ttf:family-name loader))))
              (face-name (zpb-ttf:subfamily-name loader))
@@ -96,7 +88,7 @@
                                         :family family
                                         :name (zpb-ttf:subfamily-name loader)
                                         :loader loader)))
-	     (font (ensure-gethash
+             (font (ensure-gethash
                     (list loader size) font-cache
                     (make-instance 'render-truetype-font
                                    :face font-face

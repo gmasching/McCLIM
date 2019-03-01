@@ -162,8 +162,8 @@
 (defclass standard-extended-output-stream (extended-output-stream
                                            standard-output-stream)
   ((cursor :accessor stream-text-cursor)
-   (foreground :initarg :foreground :reader stream-foreground)
-   (background :initarg :background :reader stream-background)
+   (foreground :initarg :foreground :reader foreground)
+   (background :initarg :background :reader background)
    (text-style :initarg :text-style :reader stream-text-style)
    (vspace :initarg :vertical-spacing :reader stream-vertical-spacing)
    (margin :initarg :text-margin :writer (setf stream-text-margin))
@@ -188,11 +188,52 @@
   (with-sheet-medium (medium stream)
     (medium-finish-output medium)))
 
+;;; STREAM-EFFECTIVE-*-MARGIN methods may return NIL if there is no margin
+;;; specified. If corresponding text wrap margin is NIL then text never wraps,
+;;; because end of line is never reached. Similar thing applies to lines, pages
+;;; and top/bottom margins.
+;;;
+;;; For left-to-right text starting cursor position is
+;;;   [(or effective-left-margin 0) (or effective-top-margin 0)]
+;;;
+;;; For right-to-left text starting cursor position is
+;;;   [(or effective-right-margin 0) (or effective-top-margin 0)]
+;;;
+;;; -- jd 2019-01-09
+
+(defgeneric stream-effective-left-margin (stream)
+  (:documentation "Absolute position of the left margin in stream coordinates.")
+  (:method ((stream standard-extended-output-stream))
+    0))
+
+(defgeneric stream-effective-top-margin (stream)
+  (:documentation "Absolute position of the top margin in stream coordinates.")
+  (:method ((stream standard-extended-output-stream))
+    0))
+
+(defgeneric stream-effective-right-margin (stream)
+  (:documentation "Absolute position of the right margin in stream coordinates.")
+  (:method ((stream standard-extended-output-stream))
+    (or (slot-value stream 'margin)
+        (let ((sheet (or (pane-viewport stream) stream)))
+          ;; Sheet region may not be bound (ie in PostScript backend).
+          (if (region-equal (sheet-region sheet) +everywhere+)
+              nil
+              (bounding-rectangle-width sheet))))))
+
+(defgeneric stream-effective-bottom-margin (stream)
+  (:documentation "Absolute position of the bottom margin in stream coordinates.")
+  (:method ((stream standard-extended-output-stream))
+    (bounding-rectangle-height stream)))
+
 (defmethod initialize-instance :after
     ((stream standard-extended-output-stream) &rest args)
   (declare (ignore args))
   (setf (stream-text-cursor stream)
-        (make-instance 'standard-text-cursor :sheet stream))
+        (make-instance 'standard-text-cursor
+                       :sheet stream
+                       :x-position (stream-effective-left-margin stream)
+                       :y-position (stream-effective-top-margin stream)))
   (setf (cursor-active (stream-text-cursor stream)) t))
 
 
@@ -233,134 +274,132 @@
           (call-next-method))
         (call-next-method))))
 
-(defgeneric scroll-vertical (stream dy))
-
-(defmethod scroll-vertical ((stream standard-extended-output-stream) dy)
-  (multiple-value-bind (tx ty)
-      (bounding-rectangle-position (sheet-region stream))
-    (scroll-extent stream tx (+ ty dy))))
-
-(defgeneric scroll-horizontal (stream dx))
-
-(defmethod scroll-horizontal ((stream standard-extended-output-stream) dx)
-  (multiple-value-bind (tx ty) (bounding-rectangle-position (sheet-region stream))
-    (scroll-extent stream (+ tx dx) ty)))
+;; In a next few functions we can't call (setf stream-cursor-position) because
+;; that would close the text-output-record unnecessarily. Using underlying
+;; text-cursor with (setf cursor-position) is fine as long as the cursor is
+;; off. If it were on that would close the output record too. -- jd 2019-01-07
 
 (defmacro with-cursor-off (stream &body body)
   `(letf (((cursor-visibility (stream-text-cursor ,stream)) nil))
      ,@body))
 
-(defgeneric stream-wrap-line (stream))
-
-(defmethod stream-wrap-line ((stream standard-extended-output-stream))
-  (let ((margin (stream-text-margin stream)))
-    (multiple-value-bind (cx cy) (stream-cursor-position stream)
-      (declare (ignore cx))
-      (when (stream-drawing-p stream)
-        (draw-rectangle* (sheet-medium stream) margin cy (+ margin 4)
-                         (+ cy (%stream-char-height stream))
-                         :ink +foreground-ink+
-                         :filled t))))
-  (stream-write-char stream #\newline))
-
-(defun seos-write-string (stream string &optional (start 0) end)
-  (let* ((medium       (sheet-medium stream))
-         (text-style   (medium-text-style medium))
-         (new-baseline (text-style-ascent text-style medium))
-         (new-height   (text-style-height text-style medium))
-         (margin       (stream-text-margin stream))
-         (end          (or end (length string))))
-    (flet ((find-split (delta)  ;; FIXME: This can be done smarter.
-             (loop for i from (1+ start) upto end
-                   as sub-width = (stream-string-width stream string
-                                                       :start start :end i
-                                                       :text-style text-style)
-                   while (<= sub-width delta)
-                   finally (return (1- i)))))
-      (when (eql end 0)
-        (return-from seos-write-string))
-      (with-slots (baseline vspace) stream
-        (multiple-value-bind (cx cy) (stream-cursor-position stream)
-          (when (> new-baseline baseline)
-            (setq baseline new-baseline))
-          (setf (%stream-char-height stream) (max (%stream-char-height stream) new-height))
-          (let ((width (stream-string-width stream string
-                                            :start start :end end
-                                            :text-style text-style))
-                (split end))
-            (when (>= (+ cx width) margin)
-              (ecase (stream-end-of-line-action stream)
-                (:wrap
-                 ;; Let's prevent infinite recursion if there isn't
-                 ;; room for even a single character.
-                 (setq split (max (find-split (- margin cx))
-                                  (1+ start))))
-                (:scroll
-                 (scroll-horizontal stream width))
-                (:allow)))
-            (unless (= start split)
-              (stream-write-output stream string nil start split)
-              (setq cx (+ cx width))
-              (setf (stream-cursor-position stream) (values cx cy)))
-            (when (/= split end)
-              (let ((current-baseline baseline))
-                (setf baseline current-baseline))               
-              (stream-wrap-line stream)
-              (seos-write-string stream string split end))))))))
+(defgeneric maybe-end-of-page-action (stream y)
+  (:method ((stream standard-extended-output-stream) y)
+    (let ((bottom-margin (stream-effective-bottom-margin stream))
+          (end-of-page-action (stream-end-of-page-action stream)))
+      (when (and bottom-margin (> y bottom-margin))
+        (%note-stream-end-of-page stream end-of-page-action y)
+        (ecase end-of-page-action
+          ((:scroll :allow)  nil)
+          ((:wrap :wrap*)
+           (setf (cursor-position (stream-text-cursor stream))
+                 (values (nth-value 0 (stream-cursor-position stream))
+                         (stream-effective-top-margin stream)))))))))
 
 (defgeneric %note-stream-end-of-page (stream action new-height)
   (:method (stream action new-height)
     nil))
 
+(defun seos-write-string (stream string &optional (start 0) end)
+  (setq end (or end (length string)))
+  (when (= start end)
+    (return-from seos-write-string))
+  (let* ((medium (sheet-medium stream))
+         (text-style (medium-text-style medium))
+         ;; fixme: remove assumption about the text direction (LTR).
+         (left-margin  (stream-effective-left-margin stream))
+         (right-margin (stream-effective-right-margin stream)))
+    (maxf (slot-value stream 'baseline) (text-style-ascent text-style medium))
+    (maxf (%stream-char-height stream)  (text-style-height text-style medium))
+    (multiple-value-bind (cx cy) (stream-cursor-position stream)
+      (maybe-end-of-page-action stream (+ cy (%stream-char-height stream)))
+      (let* ((width (stream-string-width stream string
+                                         :start start :end end
+                                         :text-style text-style))
+             (eol-action (stream-end-of-line-action stream))
+             (eol-p (and right-margin (> (+ cx width) right-margin))))
+        (when (or (null eol-p) (member eol-action '(:allow :scroll)))
+          (stream-write-output stream string nil start end)
+          (incf cx width)
+          (setf (cursor-position (stream-text-cursor stream)) (values cx cy))
+          (when (and right-margin
+                     (> (+ cx width) right-margin)
+                     (eql eol-action :scroll))
+            (multiple-value-bind (tx ty)
+                (bounding-rectangle-position (sheet-region stream))
+              (scroll-extent stream (+ tx width) ty)))
+          (return-from seos-write-string))
+        ;; All new lines from here on are soft new lines, we could skip
+        ;; closing the text-output-record and have multiline records to
+        ;; allow gimmics like a dynamic reflow). Also text-style doesn't
+        ;; change until the end of this function. -- jd 2019-01-10
+        (let* ((width (if (text-style-fixed-width-p text-style medium)
+                          (text-style-width text-style medium)
+                          (lambda (string start end)
+                            (text-size medium string
+                                       :text-style text-style
+                                       :start start :end end))))
+               (splits (line-breaks string width
+                                    :initial-offset (- cx (or left-margin 0))
+                                    :margin (- right-margin (or left-margin 0))
+                                    :break-strategy (ecase eol-action
+                                                      (:wrap NIL)
+                                                      (:wrap* T))
+                                    :start start :end end)))
+          (do ((start start (car split))
+               (split splits (rest split)))
+              ((null split)
+               (stream-write-output stream string nil start end)
+               (setf (cursor-position (stream-text-cursor stream))
+                     (values (+ (stream-effective-left-margin stream)
+                                (stream-string-width stream string
+                                                     :start start :end split
+                                                     :text-style text-style))
+                             (nth-value 1 (stream-cursor-position stream)))))
+            (ecase eol-action
+              (:wrap  (stream-write-output stream string nil start (car split)))
+              (:wrap* (let ((pos (position #\space string
+                                           :from-end t :start start :end (car split)
+                                           :test-not #'char=)))
+                        (when pos (incf pos))
+                        (stream-write-output stream string nil start (or pos (car split))))))
+            ;; print a soft newline
+            (stream-write-char stream #\newline)))))))
+
 (defun seos-write-newline (stream)
-  (let ((medium       (sheet-medium stream))
-        (view-height  (bounding-rectangle-height stream)))
-    (with-slots (baseline vspace) stream
-      (multiple-value-bind (cx cy) (stream-cursor-position stream)
-        (setf (%stream-char-height stream) (max (%stream-char-height stream) (text-style-height (medium-text-style medium) medium)))
-        (setf cx 0
-              cy (+ cy (%stream-char-height stream) vspace))
-        (when (> cy view-height)
-          (%note-stream-end-of-page stream (stream-end-of-page-action stream) cy)
-          (ecase (stream-end-of-page-action stream)
-            ((:scroll :allow)
-             nil)
-            (:wrap
-             (setq cy 0))))
-        ;; mikemac says that this "erase the new line" behavior is
-        ;; required by the stream text protocol, but I don't see
-        ;; it.  I'm happy to put this back in again, but in the
-        ;; meantime it makes debugging of updating-output a bit easier
-        ;; not to have "extra" records laying around.  If/When it goes
-        ;; back in... the draw-rectangle has to happen on the stream,
-        ;; not the medium. -- moore
-        #+nil(draw-rectangle* medium cx cy (+ margin 4) (+ cy height)
-                              :ink +background-ink+
-                              :filled t)
-        (setq baseline 0)
-        (setf (%stream-char-height stream) 0)
-        (setf (stream-cursor-position stream) (values cx cy))))))
-
-
-
+  (let* ((current-cy       (nth-value 1 (stream-cursor-position stream)))
+         (vertical-spacing (stream-vertical-spacing stream))
+         (updated-cy       (+ current-cy
+                              (%stream-char-height stream)
+                              vertical-spacing)))
+    (setf (cursor-position (stream-text-cursor stream))
+          (values (stream-effective-left-margin stream)
+                  updated-cy))
+    (finish-output stream)       ; this will close the output record if recorded)
+    (let* ((medium       (sheet-medium stream))
+           (text-style   (medium-text-style medium))
+           (new-baseline (text-style-ascent text-style medium))
+           (new-height   (text-style-height text-style medium)))
+      (maybe-end-of-page-action stream (+ updated-cy new-height))
+      (setf (slot-value stream 'baseline) new-baseline
+            (%stream-char-height stream)  new-height))))
 
 (defgeneric stream-write-output (stream line string-width &optional start end)
   (:documentation
-   "Writes the character or string LINE to STREAM. This function produces no
-more than one line of output i.e., doesn't wrap. If STRING-WIDTH is
-non-nil, that is used as the width where needed; otherwise
-STREAM-STRING-WIDTH will be called."))
+   "Writes the character or string LINE to STREAM. This function produces no more
+than one line of output i.e., doesn't wrap. If STRING-WIDTH is non-nil, that is
+used as the width where needed; otherwise STREAM-STRING-WIDTH will be called."))
 
 ;;; The cursor is in stream coordinates.
 (defmethod stream-write-output ((stream standard-extended-output-stream)
                                 line string-width
                                 &optional (start 0) end)
   (declare (ignore string-width))
-  (with-slots (baseline vspace) stream
+  ;; Do not capture medium transformation - this is a stream operation and we
+  ;; draw at the current cursor position. -- jd 2019-01-04
+  (with-identity-transformation (stream)
     (multiple-value-bind (cx cy) (stream-cursor-position stream)
-      (draw-text* (sheet-medium stream) line
-                  cx (+ cy baseline)
-                  :transformation +identity-transformation+
+      (draw-text* stream line cx (+ cy (stream-baseline stream))
                   :start start :end end))))
 
 (defmethod stream-write-char ((stream standard-extended-output-stream) char)
@@ -401,11 +440,8 @@ STREAM-STRING-WIDTH will be called."))
       (values final-x total-width))))
 
 (defmethod stream-text-margin ((stream standard-extended-output-stream))
-  (with-slots (margin) stream
-    (or margin
-        (- (bounding-rectangle-width (or (pane-viewport stream)
-                                         stream))
-           (text-size stream "O")))))
+  (stream-effective-right-margin stream))
+
 
 (defmethod stream-line-height ((stream standard-extended-output-stream)
                                &key (text-style nil))
@@ -416,29 +452,28 @@ STREAM-STRING-WIDTH will be called."))
 (defmethod stream-line-column ((stream standard-extended-output-stream))
   (multiple-value-bind (x y) (stream-cursor-position stream)
     (declare (ignore y))
-    (floor x (stream-string-width stream " "))))
+    (floor x (stream-string-width stream "m"))))
 
 (defmethod stream-start-line-p ((stream standard-extended-output-stream))
   (multiple-value-bind (x y) (stream-cursor-position stream)
     (declare (ignore y))
-    (zerop x)))
+    (when-let ((left-margin (stream-effective-left-margin stream)))
+      (= x left-margin))))
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defmacro with-room-for-graphics ((&optional (stream t)
-                                               &rest arguments
-                                               &key (first-quadrant t)
-                                               height
-                                               (move-cursor t)
-                                               (record-type ''standard-sequence-output-record))
-                                     &body body)
-    (declare (ignore first-quadrant height move-cursor record-type))
-    (let ((cont (gensym "CONT."))
-          (stream (stream-designator-symbol stream '*standard-output*)))
-      `(labels ((,cont (,stream)
-                  ,@body))
-         (declare (dynamic-extent #',cont))
-         (invoke-with-room-for-graphics #',cont ,stream ,@arguments)))))
+(defmacro with-room-for-graphics ((&optional (stream t)
+                                             &rest arguments
+                                             &key (first-quadrant t)
+                                             height
+                                             (move-cursor t)
+                                             (record-type ''standard-sequence-output-record))
+                                  &body body)
+  (declare (ignore first-quadrant height move-cursor record-type))
+  (let ((cont (gensym "CONT."))
+        (stream (stream-designator-symbol stream '*standard-output*)))
+    `(labels ((,cont (,stream)
+                ,@body))
+       (declare (dynamic-extent #',cont))
+       (invoke-with-room-for-graphics #',cont ,stream ,@arguments))))
 
 (defmacro with-end-of-line-action ((stream action) &body body)
   (when (eq stream t)

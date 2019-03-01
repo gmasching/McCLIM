@@ -217,7 +217,7 @@
 (defgeneric sheet-delta-transformation (sheet ancestor))
 (defgeneric sheet-allocated-region (sheet child))
 
-;;; 7.3.2 
+;;; 7.3.2
 
 ;; sheet-identity-transformation-mixin [class]
 ;; sheet-translation-mixin [class]
@@ -362,8 +362,7 @@
 (defgeneric medium-draw-text* (medium string x y
 			       start end
 			       align-x align-y
-			       toward-x toward-y transform-glyphs
-                               transformation))
+			       toward-x toward-y transform-glyphs))
 
 
 ;;; 10.1 Medium Components
@@ -384,6 +383,11 @@
 (defgeneric invoke-with-local-coordinates (medium continuation x y))
 
 (defgeneric invoke-with-first-quadrant-coordinates (medium continuation x y))
+
+
+;;;; 10.3.2 Contrasting Dash Patterns
+
+(defgeneric contrasting-dash-pattern-limit (port))
 
 
 ;;; 11.1.1 Text Style Protocol and Text Style Suboptions
@@ -411,6 +415,11 @@
 (defgeneric medium-force-output (medium))
 (defgeneric medium-clear-area (medium left top right bottom))
 (defgeneric medium-beep (medium))
+
+
+;;; 13.3.2 Contrasting Colors
+
+(defgeneric contrasting-inks-limit (port))
 
 
 ;;; 14.2
@@ -641,7 +650,7 @@ unspecified. "))
 ;;; 16.4.4 Output Recording Utilities [complete]
 
 ;; with-output-recording-options (stream &key record draw) &body body [Macro]
-(defgeneric invoke-with-output-recording-options 
+(defgeneric invoke-with-output-recording-options
     (stream continuation record draw))
 
 ;;; with-new-output-record (stream &optional record-type record &rest initargs) &body body [Macro]
@@ -649,7 +658,7 @@ unspecified. "))
     (stream continuation record-type &rest initargs &key parent &allow-other-keys))
 
 ;;; with-output-to-output-record (stream &optional record-type record &rest initargs)) &body body [Macro]
-(defgeneric invoke-with-output-to-output-record 
+(defgeneric invoke-with-output-to-output-record
     (stream continuation record-type &rest initargs))
 
 (defgeneric make-design-from-output-record (record))
@@ -668,8 +677,8 @@ unspecified. "))
 (defgeneric stream-pointer-position (stream &key pointer))
 ;; (defgeneric (setf* stream-pointer-position))
 (defgeneric stream-set-input-focus (stream))
-(defgeneric stream-read-gesture 
-    (stream &key timeout peek-p input-wait-test 
+(defgeneric stream-read-gesture
+    (stream &key timeout peek-p input-wait-test
             input-wait-handler pointer-button-press-handler))
 (defgeneric stream-input-wait (stream &key timeout input-wait-test))
 (defgeneric stream-unread-gesture (stream gesture))
@@ -683,9 +692,9 @@ unspecified. "))
 
 ;;; 23.5 Context-dependent (Typed) Input
 
-(defgeneric stream-accept 
-    (stream 
-     type &key view default default-type provide-default insert-default 
+(defgeneric stream-accept
+    (stream
+     type &key view default default-type provide-default insert-default
      replace-input history active-p prompt prompt-mode display-default
      query-identifier activation-gestures additional-activation-gestures
      delimiter-gestures additional-delimiter-gestures))
@@ -787,7 +796,7 @@ returns the two values `gesture' and `type'."))
 
 ;;; 24.4 Reading and Writing of Tokens
 
-(defgeneric replace-input 
+(defgeneric replace-input
     (stream new-input &key start end buffer-start rescan)
   ;; XXX: Nonstandard behavior for :rescan.
   (:documentation "Replaces the part of the input editing stream
@@ -903,7 +912,7 @@ panes."))
 (defgeneric frame-maintain-presentation-histories (frame))
 (defgeneric frame-find-innermost-applicable-presentation
     (frame input-context stream x y &key event))
-(defgeneric frame-input-context-button-press-handler 
+(defgeneric frame-input-context-button-press-handler
     (frame stream button-press-event))
 (defgeneric frame-document-highlighted-presentation
     (frame presentation input-context window-context x y stream))
@@ -952,7 +961,7 @@ and `cell-align-y' are as for `formatting-item-list'."))
 (defgeneric note-command-enabled (frame-manager frame command-name))
 (defgeneric note-command-disabled (frame-manager frame command-name))
 
-(defgeneric frame-manager-notify-user 
+(defgeneric frame-manager-notify-user
     (framem message-string &key frame associated-window title
             documentation exit-boxes name style text-style))
 (defgeneric generate-panes (frame-manager frame))
@@ -981,15 +990,15 @@ and `cell-align-y' are as for `formatting-item-list'."))
 ;;;; 29.3.3 Scroller Pane Classes
 
 (defgeneric pane-viewport (pane))
-(defgeneric pane-viewport-region (pane)) 
-(defgeneric pane-scroller (pane)) 
-(defgeneric scroll-extent (pane x y)) 
+(defgeneric pane-viewport-region (pane))
+(defgeneric pane-scroller (pane))
+(defgeneric scroll-extent (pane x y))
 
 (deftype scroll-bar-spec () '(member t :both :vertical :horizontal nil))
 
 ;;;; 29.3.4 The Layout Protocol
 
-;; (define-protocol-class space-requirement ()) 
+;; (define-protocol-class space-requirement ())
 
 ;; make-space-requirement &key (width 0) (max-width 0) (min-width 0) (height 0) (max-height 0) (min-height 0) [Function]
 
@@ -1006,10 +1015,10 @@ and `cell-align-y' are as for `formatting-item-list'."))
 ;; space-requirement+* space-req &key width min-width max-width height min-height max-height [Function]
 
 (defgeneric compose-space (pane &key width height)
-  (:documentation "During the space composition pass, a composite pane will 
-typically ask each of its children how much space it requires by calling COMPOSE-SPACE. 
-They answer by returning space-requirement objects. The composite will then form 
-its own space requirement by composing the space requirements of its children 
+  (:documentation "During the space composition pass, a composite pane will
+typically ask each of its children how much space it requires by calling COMPOSE-SPACE.
+They answer by returning space-requirement objects. The composite will then form
+its own space requirement by composing the space requirements of its children
 according to its own rules for laying out its children.
 
 Returns a SPACE-REQUIREMENT object."))
@@ -1056,11 +1065,13 @@ Returns a SPACE-REQUIREMENT object."))
 
 (defgeneric (setf text-style-mapping)
     (mapping port text-style &optional character-set))
+
 (defgeneric medium-miter-limit (medium)
   (:documentation
    "If LINE-STYLE-JOINT-SHAPE is :MITER and the angle between two
    consequent lines is less than the values return by
    MEDIUM-MITER-LIMIT, :BEVEL is used instead."))
+
 (defgeneric line-style-effective-thickness (line-style medium)
   (:documentation
    "Returns the thickness in device units of a line,

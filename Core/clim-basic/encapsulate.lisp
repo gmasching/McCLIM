@@ -14,8 +14,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-internals)
@@ -82,7 +82,7 @@ if there is one, or STREAM"
 					`(,var nil ,supplied))
 				    optional
 				    supplied-vars)))
-		 
+
 		 ,@(and rest
 			`(&rest ,rest-arg))))
 	   (required-params (mapcar #'(lambda (var)
@@ -108,16 +108,16 @@ if there is one, or STREAM"
 	   ,body)))))
 
 ;;; The basic input and output stream protocols, as specified by the Gray
-;;; stream proposal in Chapter Common Lisp Streams .  
+;;; stream proposal in Chapter Common Lisp Streams .
 
 ;;; Not yet, apparently
 #+nil
 (def-stream-method streamp ((stream standard-encapsulating-stream)))
 
-(def-stream-method input-stream-p 
+(def-stream-method input-stream-p
     ((stream standard-encapsulating-stream)))
 
-(def-stream-method output-stream-p 
+(def-stream-method output-stream-p
     ((stream standard-encapsulating-stream)))
 
 (def-stream-method stream-element-type
@@ -379,6 +379,9 @@ if there is one, or STREAM"
 
 (def-stream-method sheet-medium ((stream standard-encapsulating-stream)))
 
+(def-stream-method invoke-with-sheet-medium-bound
+    (continuation medium (stream standard-encapsulating-stream)))
+
 (def-stream-method queue-repaint ((stream standard-encapsulating-stream)
 				  repaint-event))
 
@@ -449,8 +452,7 @@ if there is one, or STREAM"
 (def-stream-method medium-draw-text*
     ((stream standard-encapsulating-stream)
       string x y start end align-x align-y
-     toward-x toward-y transform-glyphs
-     transformation))
+     toward-x toward-y transform-glyphs))
 
 (def-stream-method medium-finish-output
     ((stream standard-encapsulating-stream)))
@@ -464,6 +466,9 @@ if there is one, or STREAM"
 (def-stream-method medium-beep ((stream standard-encapsulating-stream)))
 
 ;;; Extended Output Streams
+
+(def-stream-method extended-output-stream-p
+    ((stream standard-encapsulating-stream)))
 
 (def-stream-method stream-text-cursor ((stream standard-encapsulating-stream)))
 
@@ -536,7 +541,14 @@ if there is one, or STREAM"
              (declare (ignore old-medium))
              (funcall continuation medium))
          drawing-options))
-                               
+
+(def-stream-method do-graphics-with-options-internal
+    ((stream standard-encapsulating-stream) (orig-medium t) function
+     &rest args &key))
+
+(def-stream-method invoke-with-room-for-graphics
+    (cont (stream standard-encapsulating-stream) &rest options))
+
 ;;; Extended Input Streams
 
 (def-stream-method extended-input-stream-p
@@ -629,7 +641,7 @@ if there is one, or STREAM"
        (funcall continuation stream))
    record
    draw))
-  
+
 (defmethod invoke-with-new-output-record
     ((stream standard-encapsulating-stream) continuation record-type
      &rest initargs)

@@ -1,10 +1,5 @@
 (in-package :mcclim-harfbuzz)
 
-(cffi:define-foreign-library libharfbuzz
-  (:unix "libharfbuzz.so"))
-
-(cffi:use-foreign-library libharfbuzz)
-
 (defmacro with-buffer ((sym) &body body)
   (alexandria:with-gensyms (buffer)
     `(let ((,buffer (hb-buffer-create)))

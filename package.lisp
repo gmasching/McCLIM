@@ -1617,8 +1617,6 @@
    #:+list-pane-view+                   ;constant
    #:option-pane-view                   ;class
    #:+option-pane-view+                 ;constant
-   #:pattern-array                      ;generic function (in franz user guide)
-   #:pattern-designs                    ;generic function (in franz user guide)
    #:pointer-input-rectangle            ;function (in franz user guide)
    #:pointer-input-rectangle*           ;function (in franz user guide)
    #:pointer-place-rubber-band-line*    ;function (in franz user guide)
@@ -1628,6 +1626,8 @@
    #:+push-button-view+                 ;constant
    #:radio-box-view                     ;class
    #:+radio-box-view+                   ;class
+   #:check-box-view                     ;class
+   #:+check-box-view+                   ;class
    #:read-bitmap-file                   ;function
    #:slider-view                        ;slider-view
    #:+slider-view+                      ;constant
@@ -1876,12 +1876,20 @@
   (:use)
   (:nicknames :clime)
   (:export
+   ;; events
+   #:event-read-with-timeout #:schedule-event
    ;; sheets
    #:always-repaint-background-mixin
    #:never-repaint-background-mixin
-
-   #:line-style-effective-thickness
+   #:background
+   #:foreground
+   ;; #:line-style-effective-thickness
+   ;; #:line-style-effective-dashes
+   ;; medium
    #:medium-miter-limit
+   #:medium-draw-glyph
+   #:medium-draw-circle*
+   ;; panes
    #:raised-pane #:raising
    #:lowered-pane #:lowering
    #:viewport-pane
@@ -1910,7 +1918,24 @@
    #:highlight-output-record-tree
    #:cut-and-paste-mixin
    #:mouse-wheel-scroll-mixin
-   
+   ;; designs and patterns
+   #:pattern
+   #:image-pattern
+   #:rectangular-tile
+   #:transformed-design
+   #:transformed-pattern
+   #:effective-transformed-design
+   #:rectangular-tile-design
+   ;; readers
+   #:pattern-array
+   #:transformed-design-design
+   #:transformed-design-transformation
+   ;; inks
+   #:indirect-ink
+   #:indirect-ink-p
+   #:indirect-ink-ink
+   #:color-rgba
+   #:design-ink
    ;; Font listing extension:
    #:font-family
    #:font-face
@@ -1932,7 +1957,6 @@
    #:find-frame-type
    ;; images
    #:rgb-image
-   #:rgb-pattern
    #:xpm-parse-file
    #:*xpm-x11-colors*))
 
@@ -1947,7 +1971,6 @@
   (:export
    ;; Originally in CLIM-INTERNALS
    #:get-next-event
-   #:invoke-with-special-choices
    #:make-graft
    #:medium-draw-circle*
    #:medium-draw-glyph
@@ -1966,13 +1989,45 @@
    #:queue-callback
    #:set-sheet-pointer-cursor
    #:synthesize-pointer-motion-event
+   ;; Text-style
+   #:text-style-to-font
    #:text-style-character-width
+   #:text-bounding-rectangle*
+   #:normalize-font-size
+   #:parse-text-style*
+   ;; Font abstraction
+   #:font-face
+   #:font-size
+   #:font-character-width
+   #:font-string-width
+   #:font-string-glyph-codes
+   #:font-glyph-code-char
+   #:font-text-extents
+   #:font-ascent
+   #:font-descent
+   #:font-leading
+   #:font-tracking
+   #:font-fixed-width
+   #:font-kerning-p
+   #:font-glyph-width
+   #:font-glyph-height
+   #:font-glyph-top
+   #:font-glyph-left
+   #:font-glyph-bottom
+   #:font-glyph-right
+   #:font-glyph-dx
+   #:font-glyph-dy
+   ;; Mixins available for backends
+   #:multiline-text-medium-mixin
+   #:approx-bbox-medium-mixin
+   #:transform-coordinates-mixin
    ;; From CLIM (mentioned in the spec)
    #:adopt-frame
    #:allocate-space
    #:destroy-mirror
    #:destroy-port
    #:graft
+   #:graftp
    #:graft-height
    #:graft-width
    #:handle-repaint
@@ -2021,7 +2076,9 @@
    #:send-selection
    #:get-selection-from-event
    ;; CLIM-EXTENSIONS
-   #:medium-miter-limit))
+   #:medium-miter-limit
+   #:medium-draw-glyph
+   #:medium-draw-circle*))
 
 (defpackage :clim-internals
   (:use :clim :clim-sys :clim-extensions :clim-backend :clim-lisp)

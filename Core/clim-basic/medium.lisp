@@ -14,8 +14,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 ;;;; TODO
@@ -44,7 +44,7 @@
 ;;
 ;;
 ;;; And when you start to think about it, text-styles are not fonts. So
-;;; we need two protocols: A text style protocol and a font protocol. 
+;;; we need two protocols: A text style protocol and a font protocol.
 ;;
 ;;; A text style is then something, which maps a sequence of characters
 ;;; into a couple of drawing commands, while probably using some font.
@@ -56,7 +56,7 @@
 ;;
 ;;; And [it can't be said too often] unicode is not a glyph encoding
 ;;; but more a kind of text formating.
-;;; 
+;;;
 ;;; [1] or even a code position
 ;;; --GB
 
@@ -202,7 +202,7 @@
 (defun device-font-text-style-p (s)
   (typep s 'device-font-text-style))
 
-(defmethod text-style-equalp ((style1 device-font-text-style) 
+(defmethod text-style-equalp ((style1 device-font-text-style)
                               (style2 device-font-text-style))
   (eq style1 style2))
 
@@ -241,17 +241,17 @@
 
 (defmethod merge-text-styles (s1 s2)
   (when (and (typep s1 'text-style)
-             (typep s2 'text-style)
              (eq s1 s2))
     (return-from merge-text-styles s1))
   (setq s1 (parse-text-style s1))
   (setq s2 (parse-text-style s2))
   (if (and (not (device-font-text-style-p s1))
-	   (not (device-font-text-style-p s2)))
+           (not (device-font-text-style-p s2)))
       (let* ((family (or (text-style-family s1) (text-style-family s2)))
              (face1 (text-style-face s1))
              (face2 (text-style-face s2))
-             (face (if (subsetp '(:bold :italic) (list face1 face2))
+             (face (if (or (and (eq face1 :bold)   (eq face2 :italic))
+                           (and (eq face1 :italic) (eq face2 :bold)))
                        '(:bold :italic)
                        (or face1 face2)))
              (size1 (text-style-size s1))
@@ -355,6 +355,18 @@
   (:documentation "Stores those parts of the medium/stream graphics state
   that need to be restored when drawing an output record"))
 
+(defclass gs-transformation-mixin (graphics-state)
+  ((transformation :initarg :transformation :accessor graphics-state-transformation
+                   :documentation "Medium transformation.")))
+
+(defmethod initialize-instance :after ((obj gs-transformation-mixin)
+                                       &key
+                                         (stream nil)
+                                         (medium (when stream
+                                                   (sheet-medium stream))))
+  (when (and medium (not (slot-boundp obj 'transformation)))
+    (setf (slot-value obj 'transformation) (graphics-state-transformation medium))))
+
 (defclass gs-ink-mixin (graphics-state)
   ((ink :initarg :ink :accessor graphics-state-ink)))
 
@@ -407,7 +419,7 @@
     (setf (slot-value obj 'text-style) (graphics-state-text-style medium))))
 
 (defclass complete-medium-state
-    (gs-ink-mixin gs-clip-mixin gs-line-style-mixin gs-text-style-mixin)
+    (gs-ink-mixin gs-clip-mixin gs-line-style-mixin gs-text-style-mixin gs-transformation-mixin)
   ())
 
 (defgeneric (setf graphics-state) (new-gs gs)
@@ -420,30 +432,35 @@
   (:method :after ((new-gs gs-line-style-mixin) (gs gs-line-style-mixin))
     (setf (graphics-state-line-style gs) (graphics-state-line-style new-gs)))
   (:method :after ((new-gs gs-text-style-mixin) (gs gs-text-style-mixin))
-    (setf (graphics-state-text-style gs) (graphics-state-text-style new-gs))))
+    (setf (graphics-state-text-style gs) (graphics-state-text-style new-gs)))
+  (:method :after ((new-gs gs-transformation-mixin) (gs gs-transformation-mixin))
+    (setf (graphics-state-transformation gs) (graphics-state-transformation new-gs))))
 
 
 ;;; MEDIUM class
 
 (defclass transform-coordinates-mixin ()
   ;; This class is reponsible for transforming coordinates in an :around method
-  ;; on medium-draw-xyz. It is mixed into basic-medium. Probably we could rid of
-  ;; this indirection and specialize directly on basic-medium.  --JD 2018-03-06
+  ;; on medium-draw-xyz. It is mixed into basic-medium. We should document it
+  ;; and mix it in the appropriate downstream backend-specific medium.  Mixing
+  ;; in basic-medium makes hardware-based transformations hard. -- jd 2018-03-06
   ())
 
 (defclass basic-medium (transform-coordinates-mixin complete-medium-state medium)
   ((foreground :initarg :foreground
                :initform +black+
-               :accessor medium-foreground)
+               :accessor medium-foreground
+               :reader foreground)
    (background :initarg :background
                :initform +white+
-               :accessor medium-background)
+               :accessor medium-background
+               :reader background)
    (ink :initarg :ink
         :initform +foreground-ink+
         :accessor medium-ink)
    (transformation :type transformation
                    :initarg :transformation
-                   :initform +identity-transformation+ 
+                   :initform +identity-transformation+
                    :accessor medium-transformation)
    (clipping-region :type region
                     :initarg :clipping-region
@@ -489,7 +506,7 @@
 
 (defmethod (setf medium-clipping-region) :after (region (medium medium))
   (declare (ignore region))
-  (let ((sheet (medium-sheet medium)))    
+  (let ((sheet (medium-sheet medium)))
     (when sheet
       (%invalidate-cached-device-regions sheet))))
 
@@ -828,18 +845,3 @@
 (defmethod graft ((medium basic-medium))
   (and (medium-sheet medium)
        (graft (medium-sheet medium))))
-
-
-(defmacro with-special-choices ((medium) &body body)
-  "Macro for optimizing drawing with graphical system dependant mechanisms."
-  (with-gensyms (fn)
-    `(flet ((,fn (,medium)
-              ,(declare-ignorable-form* medium)
-              ,@body))
-       (declare (dynamic-extent #',fn))
-       (invoke-with-special-choices #',fn ,medium))))
-
-(defgeneric invoke-with-special-choices (continuation sheet))
-
-(defmethod invoke-with-special-choices (continuation (medium t))
-  (funcall continuation medium))

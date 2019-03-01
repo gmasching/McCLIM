@@ -85,6 +85,15 @@ transformation protocol."))
   (:documentation
    "A transformation class which is neither the identity nor a translation."))
 
+(defmethod slots-for-pprint-object append ((object standard-hairy-transformation))
+  '(mxx mxy myx myy tx ty))
+
+(defmethod print-object ((self standard-hairy-transformation) sink)
+  (maybe-print-readably (self sink)
+    (print-unreadable-object (self sink :identity nil :type t)
+      (apply #'format sink "~S ~S ~S ~S ~S ~S"
+             (multiple-value-list (get-transformation self))))))
+
 (defmethod print-object ((self standard-transformation) sink)
   (print-unreadable-object (self sink :identity nil :type t)
     (apply #'format sink "~S ~S ~S ~S ~S ~S"
@@ -355,8 +364,9 @@ real numbers, and default to 0."
          (coordinate/= 0 mxx) (coordinate/= 0 myy)))) ; ?
 
 (defmethod rectilinear-transformation-p ((transformation standard-transformation))
-  ;; We just brutally test this
-  ;; Is this even correct?
+  ;; We just brutally test this;
+  ;; Q: Is this even correct?
+  ;; A: It is not for rotations by Pi/2
   (multiple-value-bind (mxx mxy myx myy) (get-transformation transformation)
     (or (and (coordinate= mxx 0) (coordinate/= mxy 0)
              (coordinate/= myx 0) (coordinate= myy 0))
@@ -424,28 +434,28 @@ real numbers, and default to 0."
                value)))
 
 (defun compose-translation-with-transformation (transformation dx dy)
-  (compose-transformations transformation
-			   (make-translation-transformation dx dy)))
+  (compose-transformations (make-translation-transformation dx dy)
+                           transformation))
 
 (defun compose-scaling-with-transformation (transformation sx sy &optional origin)
-  (compose-transformations transformation
-			   (make-scaling-transformation sx sy origin)))
+  (compose-transformations (make-scaling-transformation sx sy origin)
+                           transformation))
 
 (defun compose-rotation-with-transformation (transformation angle &optional origin)
-  (compose-transformations transformation
-			   (make-rotation-transformation angle origin)))
+  (compose-transformations (make-rotation-transformation angle origin)
+                           transformation))
 
 (defun compose-transformation-with-translation (transformation dx dy)
-  (compose-transformations (make-translation-transformation dx dy)
-			   transformation))
+  (compose-transformations transformation
+                           (make-translation-transformation dx dy)))
 
 (defun compose-transformation-with-scaling (transformation sx sy &optional origin)
-  (compose-transformations (make-scaling-transformation sx sy origin)
-			   transformation))
+  (compose-transformations transformation
+                           (make-scaling-transformation sx sy origin)))
 
 (defun compose-transformation-with-rotation (transformation angle &optional origin)
-  (compose-transformations (make-rotation-transformation angle origin)
-			   transformation))
+  (compose-transformations transformation
+                           (make-rotation-transformation angle origin)))
 
 (defmacro with-translation ((medium dx dy) &body body)
   `(with-drawing-options (,medium
@@ -733,11 +743,11 @@ real numbers, and default to 0."
       (make-translation-transformation (+ dx1 dx2) (+ dy1 dy2)))))
 
 (defmethod compose-transformations
-    (transformation2 (transformation1 standard-identity-transformation))
+    ((transformation2 transformation) (transformation1 standard-identity-transformation))
   transformation2)
 
 (defmethod compose-transformations
-    ((transformation2 standard-identity-transformation) transformation1)
+    ((transformation2 standard-identity-transformation) (transformation1 transformation))
   transformation1)
 
 (defmethod invert-transformation
@@ -780,10 +790,10 @@ real numbers, and default to 0."
   t)
 
 (defmethod transformation-equal ((t1 standard-identity-transformation)
-                                 (t2 t))
+                                 (t2 transformation))
   nil)
 
-(defmethod transformation-equal ((t2 t)
+(defmethod transformation-equal ((t2 transformation)
                                  (t1 standard-identity-transformation))
   nil)
 
@@ -795,9 +805,9 @@ real numbers, and default to 0."
            (coordinate= dy1 dy2)))))
 
 (defmethod transformation-equal ((t1 standard-translation)
-                                 (t2 t))
+                                 (t2 transformation))
   nil)
 
-(defmethod transformation-equal ((t2 t)
+(defmethod transformation-equal ((t2 transformation)
                                  (t1 standard-translation))
   nil)

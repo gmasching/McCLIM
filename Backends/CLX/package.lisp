@@ -54,17 +54,16 @@
                 #:coordinate=
                 #:get-transformation
                 ;;
-                #:invoke-with-special-choices
                 #:medium-miter-limit
-                ;; classes:
+                ;; classes
                 #:mirrored-pixmap
                 #:window-destroy-event
                 #:pointer-ungrab-event
 		#:pointer-motion-hint-event
                 #:device-font-text-style
-                ;;
-                )
-  (:import-from :clim-standard
+                ;; utils
+                #:dolines)
+  (:import-from #:climi
 		#:standard-event-port-mixin
 		#:standard-graft
 		#:pointer-grab-sheet
@@ -72,4 +71,15 @@
                 #:%sheet-mirror-transformation
 		#:standard-port)
   (:export
+   #:clx-port
+   #:clx-render-port
+   #:clx-port-display
+   #:clx-medium
+   #:clx-render-medium
+   #:initialize-clx
+   #:clx-port-screen
+   #:clx-graft
+   #:clx-port-window
+   #:sheet-xmirror
+   #:sheet-direct-xmirror
    #:port-find-all-font-families))

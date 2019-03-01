@@ -187,26 +187,24 @@ gesture, otherwise returns false."
 	do (return t)
 	finally (return nil)))
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defmacro with-input-editor-typeout ((&optional (stream t) &rest args
-                                                  &key erase)
-                                        &body body)
-    "Clear space above the input-editing stream `stream' and
+(defmacro with-input-editor-typeout ((&optional (stream t) &rest args
+                                                &key erase)
+                                     &body body)
+  "Clear space above the input-editing stream `stream' and
 evaluate `body', capturing output done to `stream'. Place will be
 obtained above the input-editing area and the output put
 there. Nothing will be displayed until `body' finishes. `Stream'
 is not evaluated and must be a symbol. If T (the default),
 `*standard-input*' will be used. `Stream' will be bound to an
 `extended-output-stream' while `body' is being evaluated."
-    (declare (ignore erase))
-    (check-type stream symbol)
-    (let ((stream (if (eq stream t) '*standard-output* stream)))
-      `(invoke-with-input-editor-typeout
-        ,stream
-        #'(lambda (,stream)
-            ,@body)
-        ,@args))))
+  (declare (ignore erase))
+  (check-type stream symbol)
+  (let ((stream (if (eq stream t) '*standard-output* stream)))
+    `(invoke-with-input-editor-typeout
+      ,stream
+      #'(lambda (,stream)
+          ,@body)
+      ,@args)))
 
 (defgeneric invoke-with-input-editor-typeout (stream continuation &key erase)
   (:documentation "Call `continuation' with a single argument, a
@@ -279,14 +277,12 @@ defaulting to T for `*standard-output*'."
   (with-input-editor-typeout (stream :erase t)
     (declare (ignore stream))))
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defmacro with-input-editing ((&optional (stream t)
-                                           &rest args
-                                           &key input-sensitizer (initial-contents "")
-                                           (class ''standard-input-editing-stream))
-                                 &body body)
-    "Establishes a context in which the user can edit the input
+(defmacro with-input-editing ((&optional (stream t)
+                                         &rest args
+                                         &key input-sensitizer (initial-contents "")
+                                         (class ''standard-input-editing-stream))
+                              &body body)
+  "Establishes a context in which the user can edit the input
 typed in on the interactive stream `stream'. `Body' is then
 executed in this context, and the values returned by `body' are
 returned as the values of `with-input-editing'. `Body' may have
@@ -312,13 +308,13 @@ is a string, the string will be inserted into the input buffer
 using `replace-input'. If it is a list, the printed
 representation of the object will be inserted into the input
 buffer using `presentation-replace-input'."
-    (setq stream (stream-designator-symbol stream '*standard-input*))
-    (with-keywords-removed (args (:input-sensitizer :initial-contents :class))
-      `(invoke-with-input-editing ,stream
-                                  #'(lambda (,stream) ,@body)
-                                  ,input-sensitizer ,initial-contents
-                                  ,class
-                                  ,@args))))
+  (setq stream (stream-designator-symbol stream '*standard-input*))
+  (with-keywords-removed (args (:input-sensitizer :initial-contents :class))
+    `(invoke-with-input-editing ,stream
+                                #'(lambda (,stream) ,@body)
+                                ,input-sensitizer ,initial-contents
+                                ,class
+                                ,@args)))
 
 (defmacro with-input-position ((stream) &body body)
   (let ((stream-var (gensym "STREAM")))
@@ -514,7 +510,7 @@ for format."
   ((string :reader not-required-type-string :initarg :string)
    (type :reader not-required-type-type :initarg :type))
   (:report (lambda (condition stream)
-	     (format stream "Input ~S is not of required type ~S"
+	     (format stream "Input ~S is not of required type ~S."
 		     (not-required-type-string condition)
 		     (not-required-type-type condition))))
   (:documentation "The error that is signalled by
@@ -692,8 +688,7 @@ stream. Output will be done to its typeout."
 		       partial-completers allow-any-input
                        (possibility-printer #'possibility-printer)
 		       (help-displays-possibilities t))
-  (let ((so-far (make-array 1 :element-type 'character :adjustable t
-			    :fill-pointer 0))
+  (let ((so-far (make-array 1 :element-type 'character :adjustable t :fill-pointer 0))
 	(*accelerator-gestures* (append *help-gestures*
 					*possibilities-gestures*
 					*accelerator-gestures*)))

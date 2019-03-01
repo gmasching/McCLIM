@@ -39,6 +39,7 @@ Daniel Barlow
 Daniel Kochmański
 Duncan Rose
 Edena Pixel
+Elias Mårtenson
 Frank Buss
 Gilbert Baumann
 Iban Hatchondo
@@ -46,6 +47,7 @@ Julien Boninfan
 Lionel Salabartan
 Max-Gerd Retzlaff
 Mike McDonald
+Nisar Ahmad
 Peter Mechleborg
 Rainer Joswig
 Robert Goldman
@@ -65,13 +67,10 @@ interface management system."
 ;;; platform.
 (defsystem #:mcclim/looks
   :depends-on (#:clim
-               #-(or mcclim-beagle mcclim-ugly mcclim-ffi-freetype mezzano)
-               #:mcclim-clx/truetype                        #| adds truetype        |#
+               #-mezzano #:mcclim-clx                                 #| raw clim-clx backend |#
+               #-mezzano #:mcclim-clx/truetype                        #| adds truetype        |#
                #+mcclim-ffi-freetype #:mcclim-clx/freetype  #| adds freetype        |#
-               #+mcclim-ugly #:mcclim-clx                   #| raw clim-clx backend |#
-               #-(or mcclim-beagle mezzano)
-               #:mcclim-clx-fb                              #| experimental backend |#
-               #+mcclim-beagle #:mcclim-beagle              #| OSX native (clozure) |#
+               #-mezzano #:mcclim-clx-fb                              #| experimental backend |#
                #+mezzano #:mcclim-mezzano                   #| Mezzano (a LISP OS)  |#
 
                ;; null backend

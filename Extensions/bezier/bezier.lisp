@@ -763,10 +763,8 @@ second curve point, yielding (200 50)."
 ;;; this is only for the CLX backend right now. Still, should fix.
 (defparameter *pixmaps* (make-hash-table :test #'equal))
 
-(defun resolve-ink (medium)
-  (if (eq (medium-ink medium) +foreground-ink+)
-      (medium-foreground medium)
-      (medium-ink medium)))
+(defmethod resolve-ink (medium)
+  (clime:design-ink (medium-ink medium) 0 0))
 
 (defun make-ink (medium transparency)
   (let* ((a (/ transparency 16.0))
@@ -845,7 +843,7 @@ second curve point, yielding (200 50)."
   (render-through-pixmap design medium))
 
 (defmethod medium-draw-bezier-design* ((sheet basic-sheet) design)
-  (render-through-pixmap design (sheet-medium sheet)))
+  (medium-draw-bezier-design* (sheet-medium sheet) design))
 
 ;;; NULL backend support
 
@@ -877,14 +875,14 @@ second curve point, yielding (200 50)."
                                        &key (bezier-draw-control-lines *bezier-draw-control-lines*)
                                             (bezier-draw-location-labels *bezier-draw-location-labels*))
   (let ((segments (mcclim-bezier:segments design)))
-    (let ((p0 (slot-value (elt segments 0) 'mcclim-bezier:p0)))
+    (let ((p0 (slot-value (elt segments 0) 'p0)))
       (let ((path (make-path (point-x p0) (point-y p0))))
         (map nil (lambda (segment)
-                   (with-slots (mcclim-bezier:p1 mcclim-bezier:p2 mcclim-bezier:p3) segment
+                   (with-slots (p1 p2 p3) segment
                      (curve-to path
-                               (point-x mcclim-bezier:p1) (point-y mcclim-bezier:p1)
-                               (point-x mcclim-bezier:p2) (point-y mcclim-bezier:p2)
-                               (point-x mcclim-bezier:p3) (point-y mcclim-bezier:p3))))
+                               (point-x p1) (point-y p1)
+                               (point-x p2) (point-y p2)
+                               (point-x p3) (point-y p3))))
              segments)
         (if filled
             (%medium-fill-paths medium (list path))
@@ -894,10 +892,10 @@ second curve point, yielding (200 50)."
           (let ((i 0))
             (map nil (lambda (segment)
                        (incf i)
-                       (with-slots ((p0 mcclim-bezier:p0)
-                                    (p1 mcclim-bezier:p1)
-                                    (p2 mcclim-bezier:p2)
-                                    (p3 mcclim-bezier:p3))
+                       (with-slots ((p0 p0)
+                                    (p1 p1)
+                                    (p2 p2)
+                                    (p3 p3))
                            segment
                          (when bezier-draw-control-lines
                            (draw-point medium p0 :ink +blue+ :line-thickness 6)
@@ -991,68 +989,71 @@ second curve point, yielding (200 50)."
 
 ;;; Postscript backend
 
-(defun %ps-draw-bezier-curve (stream area)
+(defun %ps-draw-bezier-path (stream medium design)
   (format stream "newpath~%")
-  (let ((segments (segments area)))
+  (let ((tr (sheet-native-transformation (medium-sheet medium)))
+        (segments (segments design)))
     (let ((p0 (slot-value (elt segments 0) 'p0)))
-      (write-coordinates stream (point-x p0) (point-y p0))
+      (let ((x0 (point-x p0))
+            (y0 (point-y p0)))
+        (with-transformed-position (tr x0 y0)
+          (write-coordinates stream x0 y0)))
       (format stream "moveto~%"))
     (map nil (lambda (segment)
                (with-slots (p1 p2 p3) segment
-                 (write-coordinates stream (point-x p1) (point-y p1))
-                 (write-coordinates stream (point-x p2) (point-y p2))
-                 (write-coordinates stream (point-x p3) (point-y p3))
+                 (let ((x1 (point-x p1))
+                       (y1 (point-y p1)))
+                   (with-transformed-position (tr x1 y1)
+                     (write-coordinates stream x1 y1)))
+                 (let ((x2 (point-x p2))
+                       (y2 (point-y p2)))
+                   (with-transformed-position (tr x2 y2)
+                     (write-coordinates stream x2 y2)))
+                 (let ((x3 (point-x p3))
+                       (y3 (point-y p3)))
+                   (with-transformed-position (tr x3 y3)
+                     (write-coordinates stream x3 y3)))
                  (format stream "curveto~%")))
-         segments)
-    (format stream "stroke~%")))
+         segments)))
 
-(defun %ps-draw-bezier-area (stream area)
-  (format stream "newpath~%")
-  (let ((segments (segments area)))
-    (let ((p0 (slot-value (elt segments 0) 'p0)))
-      (write-coordinates stream (point-x p0) (point-y p0))
-      (format stream "moveto~%"))
-    (map nil (lambda (segment)
-               (with-slots (p1 p2 p3) segment
-                 (write-coordinates stream (point-x p1) (point-y p1))
-                 (write-coordinates stream (point-x p2) (point-y p2))
-                 (write-coordinates stream (point-x p3) (point-y p3))
-                 (format stream "curveto~%")))
-         segments)
-    (format stream "fill~%")))
+(defun %ps-draw-bezier-curve (stream medium design)
+  (%ps-draw-bezier-path stream medium design)
+  (format stream "stroke~%"))
+
+(defun %ps-draw-bezier-area (stream medium design)
+  (%ps-draw-bezier-path stream medium design)
+  (format stream "fill~%"))
 
 (defmethod medium-draw-bezier-design*
     ((medium postscript-medium) (design bezier-curve))
-  (let ((stream (postscript-medium-file-stream medium))
-        (*transformation* (sheet-native-transformation (medium-sheet medium))))
-    (postscript-actualize-graphics-state stream medium :color :line-style)
-    (%ps-draw-bezier-curve stream design)))
+  (let ((stream (postscript-medium-file-stream medium)))
+    (with-graphics-state ((medium-sheet medium))
+      (postscript-actualize-graphics-state stream medium :color :line-style)
+      (%ps-draw-bezier-curve stream medium design))))
 
 (defmethod medium-draw-bezier-design*
     ((medium postscript-medium) (design bezier-area))
-  (let ((stream (postscript-medium-file-stream medium))
-        (*transformation* (sheet-native-transformation (medium-sheet medium))))
-    (postscript-actualize-graphics-state stream medium :color :line-style)
-    (%ps-draw-bezier-area stream design)))
+  (let ((stream (postscript-medium-file-stream medium)))
+    (with-graphics-state ((medium-sheet medium))
+      (postscript-actualize-graphics-state stream medium :color :line-style)
+      (%ps-draw-bezier-area stream medium design))))
 
 (defmethod medium-draw-bezier-design*
     ((medium postscript-medium) (design bezier-union))
-  (let ((stream (postscript-medium-file-stream medium))
-        (*transformation* (sheet-native-transformation (medium-sheet medium))))
-    (postscript-actualize-graphics-state stream medium :color :line-style)
-    (dolist (area (areas design))
-      (%ps-draw-bezier-area stream area))))
+  (let ((stream (postscript-medium-file-stream medium)))
+    (with-graphics-state ((medium-sheet medium))
+      (postscript-actualize-graphics-state stream medium :color :line-style)
+      (dolist (area (areas design))
+        (%ps-draw-bezier-area stream medium area)))))
 
 (defmethod medium-draw-bezier-design*
     ((medium postscript-medium) (design bezier-difference))
-  (let ((stream (postscript-medium-file-stream medium))
-        (*transformation* (sheet-native-transformation (medium-sheet medium))))
+  (let ((stream (postscript-medium-file-stream medium)))
     (postscript-actualize-graphics-state stream medium :color :line-style)
     (dolist (area (positive-areas design))
-      (%ps-draw-bezier-area stream area))
+      (%ps-draw-bezier-area stream medium area))
     (with-drawing-options (medium :ink +background-ink+)
       (postscript-actualize-graphics-state stream medium :color :line-style)
       (dolist (area (negative-areas design))
-        (%ps-draw-bezier-area stream area)))))
-
+        (%ps-draw-bezier-area stream medium area)))))
 

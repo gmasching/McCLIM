@@ -44,7 +44,6 @@
                 #:coordinate=
                 #:get-transformation
                 ;;
-                #:invoke-with-special-choices
                 #:medium-miter-limit
                 ;; classes:
                 #:mirrored-pixmap
@@ -61,27 +60,19 @@
 		  #:image-mirror-image
 		  #:image-sheet-mixin
 		  #:image-pixmap-mixin
-                  #:image-pixels
                   #:image-pixmap-mixin
-                  #:image-mirror-mixin
-                  #:opticl-rgb-image-pixels
-		  )
+                  #:image-mirror-mixin)
    (:import-from :clim-clx
 		 #:CLX-PORT-DISPLAY
 		 #:clx-medium
 		 #:initialize-clx
-		#:design-gcontext
-		#:medium-draw-rectangle-using-ink*
-		#:REGION->CLIPPING-VALUES
-		#:ROUND-COORDINATE
-		#:with-clx-graphics
-		#:clx-port-screen
+                 #:clx-port-screen
 		#:clx-graft
 		#:clx-port-window
 		#:sheet-xmirror
 		#:sheet-direct-xmirror
 		)
-  (:import-from :clim-standard
+  (:import-from :climi
 		#:standard-event-port-mixin
 		#:standard-port))
 

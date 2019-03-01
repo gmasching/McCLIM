@@ -837,7 +837,7 @@ in an equalp hash table"))
          ;; moves
          nil
          ;; draws
-         come
+         (nreverse come)
          ;; erase overlapping
          (append gone-overlap come-overlap)
          ;; move overlapping
@@ -1054,13 +1054,6 @@ in an equalp hash table"))
    record
    t))
 
-(defun convert-from-relative-to-absolute-coordinates (stream record)
-  (declare (ignore stream record))
-  "This compatibility function returns offsets that are suitable for
-  drawing records that are the children of `record'. In McCLIM this is
-  a noop because output records are kept in stream coordinates."
-  (values 0 0))
-
 
 ;;; Support for explicitly changing output records
 
@@ -1094,39 +1087,33 @@ in an equalp hash table"))
 	(propagate-to-updating-output
 	 parent child mode old-bounding-rectangle)))))
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defgeneric note-output-record-child-changed
-      (record child mode old-position old-bounding-rectangle stream
-       &optional erases moves draws erase-overlapping move-overlapping
-       &key check-overlapping)))
+(defgeneric note-output-record-child-changed
+    (record child mode old-position old-bounding-rectangle stream
+     &optional erases moves draws erase-overlapping move-overlapping
+     &key check-overlapping))
 
 ;;; The default - do nothing
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defmethod note-output-record-child-changed
-      (record child mode old-position old-bounding-rectangle stream
-       &optional erases moves draws erase-overlapping move-overlapping
-       &key check-overlapping)
-    (declare (ignore record child mode old-position old-bounding-rectangle stream
-                     erases moves draws erase-overlapping move-overlapping
-                     check-overlapping))
-    nil))
+(defmethod note-output-record-child-changed
+    (record child mode old-position old-bounding-rectangle stream
+     &optional erases moves draws erase-overlapping move-overlapping
+     &key check-overlapping)
+  (declare (ignore record child mode old-position old-bounding-rectangle stream
+                   erases moves draws erase-overlapping move-overlapping
+                   check-overlapping))
+  nil)
 
-(locally
-    (declare #+sbcl (sb-ext:muffle-conditions style-warning))
-  (defmethod note-output-record-child-changed
-      (record (child displayed-output-record) (mode (eql :move))
-       old-position old-bounding-rectangle
-       (stream updating-output-stream-mixin)
-       &optional erases moves draws erase-overlapping move-overlapping
-       &key (check-overlapping t))
-    (declare (ignore old-position erases moves draws erase-overlapping
-                     move-overlapping
-                     check-overlapping))
-    (when (stream-redisplaying-p stream)
-      (propagate-to-updating-output record child  mode old-bounding-rectangle))))
+(defmethod note-output-record-child-changed
+    (record (child displayed-output-record) (mode (eql :move))
+     old-position old-bounding-rectangle
+     (stream updating-output-stream-mixin)
+     &optional erases moves draws erase-overlapping move-overlapping
+     &key (check-overlapping t))
+  (declare (ignore old-position erases moves draws erase-overlapping
+                   move-overlapping
+                   check-overlapping))
+  (when (stream-redisplaying-p stream)
+    (propagate-to-updating-output record child  mode old-bounding-rectangle)))
 
 (defmethod* (setf output-record-position) :around
     (nx ny (record displayed-output-record))

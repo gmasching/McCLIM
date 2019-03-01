@@ -13,8 +13,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-internals)
@@ -770,5 +770,3 @@
 (defconstant +DarkRed+ (make-named-color "DarkRed" 0.5451 0.0000 0.0000))
 (defconstant +light-green+ (make-named-color "light-green" 0.5647 0.9333 0.5647))
 (defconstant +LightGreen+ (make-named-color "LightGreen" 0.5647 0.9333 0.5647))
-
-(defconstant +contrasting-colors+ (vector +black+ +red+ +green+ +blue+ +cyan+ +magenta+ +yellow+ +white+))

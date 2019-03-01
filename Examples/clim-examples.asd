@@ -2,9 +2,11 @@
 
 ;;; CLIM-Examples depends on having at least one backend loaded.
 (defsystem #:clim-examples
-    :depends-on (#:mcclim #:mcclim-layouts/tab :mcclim-raster-image #:mcclim-bezier #:closer-mop)
+    :depends-on (#:alexandria #:mcclim #:mcclim-layouts/tab :mcclim-raster-image #:mcclim-bezier #:closer-mop)
     :components
     ((:file "package")
+     (:file "text-size-util")
+     (:file "seos-baseline")
      (:file "calculator")
      (:file "colorslider")
      (:file "menutest")                 ; extra
@@ -18,6 +20,7 @@
      (:file "tabdemo")
      (:file "sliderdemo")
      (:file "tabledemo")
+     (:file "image-transform-demo")
      (:file "demodemo")
      (:file "stream-test")
      (:file "presentation-test")
@@ -27,21 +30,27 @@
      (:file "stopwatch")
      (:file "dragndrop-translator")
      (:file "draggable-graph")
-     (:file "text-size-test")
+     (:file "text-size-test" :depends-on ("text-size-util"))
      (:file "drawing-benchmark")
      (:file "logic-cube")
      (:file "views")
      (:file "font-selector")
      (:file "bordered-output-examples")
      (:file "misc-tests")
-     (:file "drawing-tests")
+     (:file "drawing-tests" :depends-on ("text-size-util"))
      (:file "render-image-tests")
      (:file "image-viewer")
      (:file "accepting-values")
      (:file "accepting-values-test")
      (:file "graph-toy")
      (:file "coordinate-swizzling")
-     (:file "hierarchy-tool")))
+     (:file "hierarchy-tool")
+     (:file "patterns")
+     (:file "flipping-ink")
+     (:file "patterns-overlap")
+     (:file "text-transformation-test")
+     (:file "text-multiline-positioning")
+     (:file "indentation")))
 
 (defsystem #:clim-examples/superapp
   :depends-on (#:mcclim #:bordeaux-threads)

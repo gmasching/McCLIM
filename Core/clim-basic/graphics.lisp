@@ -2,7 +2,7 @@
 
 ;;;  (c) copyright 1998,1999,2000,2001 by Michael McDonald (mikemac@mikemac.com)
 ;;;  (c) copyright 2001 by Arnaud Rouanet (rouanet@emi.u-bordeaux.fr)
-;;;  (c) copyright 2014 by 
+;;;  (c) copyright 2014 by
 ;;;      Robert Strandh (robert.strandh@gmail.com)
 
 ;;; This library is free software; you can redistribute it and/or
@@ -16,14 +16,14 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-internals)
 
 ;;; Work in progress that reduces consing of rest arguments and keyword
-;;; processing. 
+;;; processing.
 (defmacro with-medium-and-options ((sheet
 				    &key ink clipping-region transformation
 				    line-unit line-thickness
@@ -67,18 +67,22 @@
 ;;; CLIM-INTERNALS package.  It is used in the expansion of the macro
 ;;; WITH-MEDIUM-OPTIONS.
 (defgeneric do-graphics-with-options (medium function &rest options))
-	  
+
 (defmethod do-graphics-with-options ((sheet sheet) func &rest options)
   (with-sheet-medium (medium sheet)
-    (apply #'do-graphics-with-options-internal medium sheet func options)))
+    (let ((*foreground-ink* (medium-foreground medium))
+          (*background-ink* (medium-background medium)))
+      (apply #'do-graphics-with-options-internal medium sheet func options))))
 
 (defmethod do-graphics-with-options ((medium medium) func &rest options)
-  (apply #'do-graphics-with-options-internal medium medium func options))
+  (let ((*foreground-ink* (medium-foreground medium))
+        (*background-ink* (medium-background medium)))
+    (apply #'do-graphics-with-options-internal medium medium func options)))
 
 (defmethod do-graphics-with-options ((sheet t) func &rest options)
   (declare (ignore options))
-  (if sheet
-      (funcall func sheet)))
+  (when sheet
+    (funcall func sheet)))
 
 (defmethod do-graphics-with-options ((pixmap pixmap) func &rest options)
   (with-pixmap-medium (medium pixmap)
@@ -107,7 +111,7 @@
     (unwind-protect
         (progn
           (when (eq ink old-ink) (setf ink nil))
-          
+
 	  (when ink
 	      (setf (medium-ink medium) ink))
 	  (when transformation
@@ -163,10 +167,10 @@
                                                 text-style)))
           (when changed-text-style
             (setf (medium-text-style medium) text-style))
-          
+
 	  (when orig-medium
 	    (funcall func orig-medium)))
-        
+
       (when ink
 	(setf (medium-ink medium) old-ink))
       ;; First set transformation, then clipping!
@@ -176,7 +180,7 @@
 	(setf (medium-clipping-region medium) old-clip))
       (when changed-line-style
         (setf (medium-line-style medium) old-line-style))
-      (when changed-text-style 
+      (when changed-text-style
         (setf (medium-text-style medium) old-text-style)))))
 
 (defmacro with-medium-options ((sheet args)
@@ -210,13 +214,15 @@
 					&rest drawing-options)
   (with-sheet-medium (medium sheet)
     (with-medium-options (medium drawing-options)
-      (funcall continuation medium))))
+      ;; We need to pass SHEET to CONTINUATION (not MEDIUM, like we
+      ;; used to) so that output recording works.
+      (funcall continuation sheet))))
 
 ;;; Compatibility with real CLIM
-(defmethod invoke-with-drawing-options ((sheet t) continuation
+(defmethod invoke-with-drawing-options ((medium t) continuation
 					&rest drawing-options)
   (declare (ignore drawing-options))
-  (funcall continuation sheet))
+  (funcall continuation medium))
 
 (defmethod invoke-with-identity-transformation
     ((sheet sheet) continuation)
@@ -285,6 +291,29 @@
                                    xlen 0 0 (- ylen)
                                    x y))
         (funcall cont medium)))))
+
+;;;; 10.3 Line Styles
+
+;;;; 10.3.2 Contrasting Dash Patterns
+
+(defconstant +contrasting-dash-patterns+
+  #(#(2 2) #(4 4) #(8 8) #(8 2) #(2 2 8 2)))
+
+(defmethod contrasting-dash-pattern-limit (port)
+  (length +contrasting-dash-patterns+))
+
+(defun make-contrasting-dash-patterns (n &optional k)
+  (let ((contrasting-dash-patterns +contrasting-dash-patterns+))
+    (unless (<= 1 n (length contrasting-dash-patterns))
+      (error "The argument N = ~D is out of range [1, ~D]"
+             n (length contrasting-dash-patterns)))
+    (unless (or (null k) (<= 0 k (1- n)))
+      (error "The argument K = ~D is out of range [0, ~D]" k (1- n)))
+    (if (null k)
+        (subseq contrasting-dash-patterns 0 n)
+        (aref contrasting-dash-patterns k))))
+
+;;;; 12 Graphics
 
 (defun draw-point (sheet point
 		   &rest args
@@ -533,7 +562,7 @@
         (medium-draw-text* medium string x y
                            start end
                            align-x align-y
-                           toward-x toward-y transform-glyphs (medium-transformation medium))))))
+                           toward-x toward-y transform-glyphs)))))
 
 (defun draw-text* (sheet string x y
 		   &rest args
@@ -548,7 +577,7 @@
     (medium-draw-text* medium string x y
 		       start end
 		       align-x align-y
-		       toward-x toward-y transform-glyphs (medium-transformation medium))))
+		       toward-x toward-y transform-glyphs)))
 
 ;; This function belong to the extensions package.
 (defun draw-glyph (sheet string x y
@@ -650,7 +679,7 @@ position for the character."
 				       (- q head-length) width/2)
 				 :filled nil
 				 :closed nil))
-		
+
 		(unless (< q p)
 		  (draw-line* sheet q 0 p 0)))))))))
 
@@ -675,10 +704,10 @@ position for the character."
 		   line-unit line-dashes line-cap-shape))
   (check-type x-radius (real 0))
   (check-type y-radius (real 0))
-  (if (or (coordinate= x-radius 0) (coordinate= y-radius 0))
-      (draw-circle* sheet center-x center-y (max x-radius y-radius)
-                    :filled filled)
-      (with-medium-options (sheet args)
+  (with-medium-options (sheet args)
+    (if (or (coordinate= x-radius 0) (coordinate= y-radius 0))
+        (draw-circle* sheet center-x center-y (max x-radius y-radius)
+                      :filled filled)
         (if (coordinate<= y-radius x-radius)
             (let ((x1 (- center-x x-radius)) (x2 (+ center-x x-radius))
                   (y1 (- center-y y-radius)) (y2 (+ center-y y-radius)))
@@ -765,7 +794,7 @@ position for the character."
                 (,record (with-output-to-output-record (,medium-var)
                            ,@body)))
            (with-output-to-pixmap
-               (,medium-var 
+               (,medium-var
                 ,sheet
                 :width ,(or width `(bounding-rectangle-width ,record))
                 :height ,(or height `(bounding-rectangle-height ,record)))
@@ -798,7 +827,7 @@ position for the character."
 			       (- pixmap-y1)))
 	       (pixmap (allocate-pixmap msheet pixmap-width pixmap-height)))
 	  (unless pixmap
-	    (error "Couldn't allocate pixmap")) 
+	    (error "Couldn't allocate pixmap"))
 	  (multiple-value-bind (user-pixmap-x1 user-pixmap-y1)
 	      (untransform-position world-transform pixmap-x1 pixmap-y1)
 	    (multiple-value-bind (user-pixmap-x2 user-pixmap-y2)
@@ -895,8 +924,7 @@ position for the character."
 (def-graphic-op draw-text (string x y
 			       start end
 			       align-x align-y
-			       toward-x toward-y transform-glyphs
-                               transformation))
+			       toward-x toward-y transform-glyphs))
 
 
 ;;;;
@@ -1011,37 +1039,59 @@ position for the character."
 
 (defmethod draw-design (medium (pattern pattern)
 			&key clipping-region transformation &allow-other-keys)
-  (draw-pattern* medium pattern 0 0
-   :clipping-region clipping-region :transformation transformation))
+  ;; It is said, that DRAW-PATTERN* performs only translation from the supplied
+  ;; transformation. If we draw pattern with a DRAW-DESIGN we do apply full
+  ;; transformation. That way we have open door for easy drawing transformed
+  ;; patterns without compromising the specification. -- jd 2018-09-08
+  (let ((width (pattern-width pattern))
+        (height (pattern-height pattern)))
+    (if (or clipping-region transformation)
+        (with-drawing-options (medium :clipping-region clipping-region :transformation transformation)
+          #1=(draw-rectangle* medium 0 0 width height
+                              :ink (transform-region (medium-transformation medium) pattern)))
+        #1#)))
+
+(defmethod draw-design (medium (pattern transformed-pattern)
+			&key clipping-region transformation &allow-other-keys)
+  (if (or clipping-region transformation)
+      (with-drawing-options (medium :clipping-region clipping-region :transformation transformation)
+        #1=(let* ((effective-pattern (effective-transformed-design pattern))
+                  (pattern-tr (transformed-design-transformation effective-pattern))
+                  (pattern-ds (transformed-design-design effective-pattern))
+                  (ink-tr (compose-transformations (medium-transformation medium) pattern-tr))
+                  (width (pattern-width pattern-ds))
+                  (height (pattern-height pattern-ds))
+                  (region (transform-region pattern-tr (make-rectangle* 0 0 width height))))
+             (draw-design medium region :ink (transform-region ink-tr pattern-ds))))
+      #1#))
 
 (defun draw-pattern* (medium pattern x y &key clipping-region transformation)
-  ;; Note: I believe the sample implementation in the spec is incorrect.
-  ;; --GB
+  ;; Note: I believe the sample implementation in the spec is incorrect. --GB
+  ;; Note: It is just slightly incorrect - patterns are rectangular objects
+  ;; aligned with XY axis. For drawing transformed designs we need to transform
+  ;; said rectangular region hence we need to use DRAW-DESIGN. -- jd 2018-09-05
   (check-type pattern pattern)
-  (cond ((or clipping-region transformation)
-         (with-drawing-options (medium :clipping-region clipping-region
-                                       :transformation transformation)
-           ;; Now this is totally bogus.
-           (medium-draw-pattern* medium pattern x y) ))
-        (t
-         ;; What happens if there is already a transformation
-         ;; applied to the medium?
-         (medium-draw-pattern* medium pattern x y))))
-
-(defmethod medium-draw-pattern* (medium pattern x y)
-  (let ((width  (pattern-width pattern))
-        (height (pattern-height pattern)))
-    ;; As I read the spec, the pattern itself is not transformed, so
-    ;; we should draw the full (untransformed) pattern at the
-    ;; tranformed x/y coordinates. This requires we revert to the
-    ;; identity transformation before drawing the rectangle. -Hefner
-    (with-transformed-position ((medium-transformation medium) x y)
-      (with-identity-transformation (medium)
-	(draw-rectangle* medium x y (+ x width) (+ y height)
-			 :filled t
-			 :ink (transform-region
-			       (make-translation-transformation x y)
-			       pattern))))))
+  (let* ((width (pattern-width pattern))
+         (height (pattern-height pattern))
+         (region (make-rectangle* x y (+ x width) (+ y height))))
+    (if (or clipping-region transformation)
+        (with-drawing-options (medium :clipping-region clipping-region :transformation transformation)
+          ;; As I read the spec, the pattern itself is not transformed, so we
+          ;; should draw the full (untransformed) pattern at the tranformed x/y
+          ;; coordinates. This requires we revert to the identity transformation
+          ;; before drawing the rectangle. -Hefner
+          #1=(with-bounding-rectangle* (x1 y1 x2 y2)
+                 (transform-region (medium-transformation medium) region)
+               (declare (ignore x2 y2))
+               (let* ((effective-pattern (effective-transformed-design pattern))
+                      (pattern-tr (compose-transformations
+                                   (make-translation-transformation x1 y1)
+                                   (transformed-design-transformation effective-pattern)))
+                      (pattern-ds (transformed-design-design effective-pattern))
+                      (region (transform-region pattern-tr (make-rectangle* 0 0 width height))))
+                 (with-identity-transformation (medium)
+                   (draw-design medium region :ink (transform-region pattern-tr pattern-ds))))))
+        #1#)))
 
 (defun draw-rounded-rectangle* (sheet x1 y1 x2 y2
                                       &rest args &key
@@ -1060,7 +1110,7 @@ position for the character."
       (let ((medium sheet))
         (if (not (and (>= (- x2 x1) (* 2 radius-x))
                       (>= (- y2 y1) (* 2 radius-y))))
-            (draw-rectangle* medium x1 y1 x2 y2)       
+            (draw-rectangle* medium x1 y1 x2 y2)
             (with-grown-rectangle* ((ix1 iy1 ix2 iy2) (x1 y1 x2 y2)
                                     :radius-left   (- radius-left)
                                     :radius-right  (- radius-right)
@@ -1134,4 +1184,3 @@ position for the character."
                                   :radius-left :radius-right
                                   :radius-top  :radius-bottom))
      args)))
-

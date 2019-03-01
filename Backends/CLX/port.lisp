@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp; Package: CLIM-CLX; -*-
 
 ;;;  (c) copyright 1998,1999,2000 by Michael McDonald (mikemac@mikemac.com)
-;;;  (c) copyright 2000,2001 by 
+;;;  (c) copyright 2000,2001 by
 ;;;           Iban Hatchondo (hatchond@emi.u-bordeaux.fr)
 ;;;           Julien Boninfante (boninfan@emi.u-bordeaux.fr)
 ;;;  (c) copyright 2000, 2001, 2014, 2016 by
@@ -18,8 +18,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-clx)
@@ -34,8 +34,10 @@
 		    clx-text-selection-port-mixin
 		    clx-basic-port)
   ((color-table :initform (make-hash-table :test #'eq))
-   
+
    (design-cache :initform (make-hash-table :test #'eq))))
+
+(defclass clx-render-port (clx-port) ())
 
 
 (defun automagic-clx-server-path (port-type)
@@ -80,22 +82,18 @@
 
 (defun parse-clx-server-path (path)
   (let* ((port-type (pop path))
-         (mirroring (mirror-factory (getf path :mirroring)))
-         (font-renderer (getf path :font-renderer 'clx-standard-font-renderer)))
+         (mirroring (mirror-factory (getf path :mirroring))))
     (remf path :mirroring)
-    (remf path :font-renderer)
     (if path
         `(,port-type
           :host ,(getf path :host "localhost")
           :display-id ,(getf path :display-id 0)
           :screen-id ,(getf path :screen-id 0)
           :protocol ,(getf path :protocol :internet)
-          :font-renderer ,font-renderer
           ,@(when mirroring (list :mirroring mirroring)))
         (append (helpfully-automagic-clx-server-path port-type)
                 (when mirroring
-                  (list :mirroring mirroring))
-                (list :font-renderer font-renderer)))))
+                  (list :mirroring mirroring))))))
 
 (setf (get :x11 :port-type) 'clx-port)
 (setf (get :x11 :server-path-parser) 'parse-clx-server-path)
@@ -104,11 +102,9 @@
 
 (defgeneric initialize-clx (port))
 
-(defmethod initialize-instance :after ((port clx-port) &rest args)
-  (declare (ignore args))
+(defmethod initialize-instance :after ((port clx-port) &key)
   (let ((options (cdr (port-server-path port))))
-    (push (apply #'make-instance 'clx-frame-manager
-                 :port port options)
+    (push (apply #'make-instance 'clx-frame-manager :port port options)
           (slot-value port 'frame-managers))
     (setf (slot-value port 'pointer)
           (make-instance 'clx-pointer :port port)))
@@ -131,7 +127,7 @@
 				(map t)
 				(backing-store :not-useful)
                                 (save-under :off)
-				(event-mask `(:exposure 
+				(event-mask `(:exposure
 					      :key-press :key-release
 					      :button-press :button-release
                                               :owner-grab-button
@@ -311,12 +307,16 @@
     graft))
 
 (defmethod make-medium ((port clx-port) sheet)
-  (make-instance 'clx-medium 
-		 ;; :port port 
-		 ;; :graft (find-graft :port port) 
+  (make-instance 'clx-medium
+		 ;; :port port
+		 ;; :graft (find-graft :port port)
 		 :sheet sheet))
 
-
+(defmethod make-medium ((port clx-render-port) sheet)
+  (make-instance 'clx-render-medium
+		 ;; :port port
+		 ;; :graft (find-graft :port port)
+		 :sheet sheet))
 
 (defmethod graft ((port clx-port))
   (first (port-grafts port)))
@@ -326,7 +326,7 @@
 (defmethod realize-mirror ((port clx-port) (pixmap pixmap))
   (when (null (port-lookup-mirror port pixmap))
     (let* ((window (sheet-xmirror (pixmap-sheet pixmap)))
-	   (pix (xlib:create-pixmap 
+	   (pix (xlib:create-pixmap
 		    :width (round (pixmap-width pixmap))
 		    :height (round (pixmap-height pixmap))
 		    :depth (xlib:drawable-depth window)
@@ -335,9 +335,9 @@
     (values)))
 
 (defmethod destroy-mirror ((port clx-port) (pixmap pixmap))
-  (when (port-lookup-mirror port pixmap)
-    (xlib:free-pixmap (port-lookup-mirror port pixmap))
-    (port-unregister-mirror port pixmap (port-lookup-mirror port pixmap))))
+  (alexandria:when-let ((mirror (port-lookup-mirror port pixmap)))
+    (xlib:free-pixmap mirror)
+    (port-unregister-mirror port pixmap mirror)))
 
 (defmethod port-allocate-pixmap ((port clx-port) sheet width height)
   (let ((pixmap (make-instance 'mirrored-pixmap
@@ -360,7 +360,7 @@
   (when (sheet-direct-xmirror pane)
     (with-slots (space-requirement) pane
       '(setf (xlib:wm-normal-hints (sheet-direct-xmirror pane))
-            (xlib:make-wm-size-hints 
+            (xlib:make-wm-size-hints
              :width (round width)
              :height (round height)
              :max-width (min 65535 (round (space-requirement-max-width space-requirement)))

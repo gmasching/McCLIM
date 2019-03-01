@@ -98,6 +98,7 @@
                           :writer %%set-sheet-native-transformation
                           :reader %%sheet-native-transformation)
    (native-region :type (or null region)
+                  :initarg :native-region
 		  :initform nil)
    (device-transformation :type (or null transformation)
                           :initform nil)
@@ -264,9 +265,12 @@
   (let ((transform (sheet-transformation sheet)))
     (multiple-value-bind (old-x old-y)
         (transform-position transform 0 0)
-      (setf (sheet-transformation sheet)
-            (compose-translation-with-transformation
-             transform (- x old-x) (- y old-y))))))
+      (let ((dx (- x old-x))
+            (dy (- y old-y)))
+        (unless (and (zerop dx) (zerop dy))
+          (setf (sheet-transformation sheet)
+                (compose-translation-with-transformation
+                 transform (- x old-x) (- y old-y))))))))
 
 (defmethod resize-sheet ((sheet basic-sheet) width height)
   (setf (sheet-region sheet)
@@ -619,7 +623,7 @@
 ;;; sheet multiple child mixin
 
 (defclass sheet-multiple-child-mixin ()
-  ((children :initform nil :initarg :children :accessor sheet-children)))
+  ((children :initform nil :accessor sheet-children)))
 
 (defmethod sheet-adopt-child ((sheet sheet-multiple-child-mixin)
 			      (child sheet-parent-mixin))

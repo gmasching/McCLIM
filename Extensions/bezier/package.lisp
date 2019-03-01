@@ -11,14 +11,15 @@
                 #:line-to
                 #:curve-to
                 #:%medium-fill-paths
-                #:%medium-stroke-paths)
+                #:%medium-stroke-paths
+                #:with-transformed-position)
 
   (:import-from #:clim-postscript
-                #:*transformation*
                 #:postscript-medium
                 #:postscript-medium-file-stream
                 #:postscript-actualize-graphics-state
-                #:write-coordinates)
+                #:write-coordinates
+                #:with-graphics-state)
 
   (:export #:bezier-design
            #:bezier-curve
@@ -41,7 +42,6 @@
 
            #:relative-to-absolute-coord-seq
            #:segments
-           #:p0 #:p1 #:p2 #:p3
            #:region-difference
            #:convolve-regions
 

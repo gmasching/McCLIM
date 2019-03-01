@@ -1,6 +1,6 @@
 ;;; -*- Mode: Lisp; Package: CLIM-INTERNALS -*-
 
-;;;  (c) copyright 2000, 2014 by 
+;;;  (c) copyright 2000, 2014 by
 ;;;           Robert Strandh (robert.strandh@gmail.com)
 
 ;;; This library is free software; you can redistribute it and/or
@@ -14,8 +14,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-internals)
@@ -52,28 +52,26 @@
 
 (defun menu-draw-highlighted (gadget)
   (when (sheet-mirror gadget)           ;XXX only do this when the gadget is realized.
-    (with-special-choices (gadget)
-      (with-slots (label) gadget
-        (with-bounding-rectangle* (x1 y1 x2 y2) (sheet-region gadget)
-          (let ((w (- x2 x1))
-                (h (- y2 y1)))
-            (draw-rectangle* gadget -1 -1 x2 y2
-                             :ink (gadget-highlighted-color gadget)
-                             :filled t)
-            (draw-edges-lines* gadget +white+ 0 0 +black+ (1- w) (1- h))
-            (draw-label* gadget x1 y1 x2 y2)))))))
+    (with-slots (label) gadget
+      (with-bounding-rectangle* (x1 y1 x2 y2) (sheet-region gadget)
+        (let ((w (- x2 x1))
+              (h (- y2 y1)))
+          (draw-rectangle* gadget -1 -1 x2 y2
+                           :ink (gadget-highlighted-color gadget)
+                           :filled t)
+          (draw-edges-lines* gadget +white+ 0 0 +black+ (1- w) (1- h))
+          (draw-label* gadget x1 y1 x2 y2))))))
 
 (defun menu-draw-unhighlighted (gadget)
   (when (sheet-mirror gadget)           ;XXX only do this when the gadget is realized.
-    (with-special-choices (gadget)
-      (with-slots (label) gadget
-        (with-bounding-rectangle* (x1 y1 x2 y2) (sheet-region gadget)
-          (let ((w (- x2 x1))
-                (h (- y2 y1)))
-            (draw-rectangle* gadget -1 -1 w h ;-1 -1 x2 y2
-                             :ink +background-ink+
-                             :filled t)
-            (draw-label* gadget x1 y1 x2 y2)))))))
+    (with-slots (label) gadget
+      (with-bounding-rectangle* (x1 y1 x2 y2) (sheet-region gadget)
+        (let ((w (- x2 x1))
+              (h (- y2 y1)))
+          (draw-rectangle* gadget -1 -1 w h ;-1 -1 x2 y2
+                           :ink +background-ink+
+                           :filled t)
+          (draw-label* gadget x1 y1 x2 y2))))))
 
 (defgeneric arm-branch (pane))
 
@@ -264,7 +262,7 @@ account, and create a list of menu buttons."
 
 
 (defmethod handle-repaint ((pane menu-divider-leaf-pane) region)
-  (let ((label (slot-value pane 'label)))   
+  (let ((label (slot-value pane 'label)))
     (multiple-value-bind (x1 y1 x2 y2)
         (bounding-rectangle* (sheet-region pane))
       (declare (ignore y2))
@@ -284,9 +282,6 @@ account, and create a list of menu buttons."
 
 ;;; Menu creation from command tables
 
-(defparameter *enabled-text-style*  (make-text-style :sans-serif :roman :normal))
-(defparameter *disabled-text-style* (make-text-style :sans-serif :roman :normal))
-
 (defun make-menu-button-from-menu-item (item client
 					&key (bottomp nil)
                                         (vertical nil)
@@ -304,18 +299,14 @@ account, and create a list of menu buttons."
          (if (command-enabled command-name frame)
              (make-pane-1 manager frame 'menu-button-leaf-pane
                           :label name
-                          :text-style *enabled-text-style*
                           :client client
-                          :vertical vertical
                           :value-changed-callback
                           #'(lambda (gadget val)
                               (declare (ignore gadget val))
                               (throw-object-ptype item presentation-type)))
              (let ((pane (make-pane-1 manager frame 'menu-button-leaf-pane
                             :label name
-                            :text-style *disabled-text-style*
                             :client client
-                            :vertical vertical
                             :value-changed-callback
                             #'(lambda (gadget val)
                                 (declare (ignore gadget val))
@@ -325,9 +316,7 @@ account, and create a list of menu buttons."
       (:function
         (make-pane-1 manager frame 'menu-button-leaf-pane
                      :label name
-                     :text-style *enabled-text-style*
                      :client client
-                     :vertical vertical
                      :value-changed-callback
                      #'(lambda (gadget val)
                          (declare (ignore gadget val))
@@ -340,7 +329,6 @@ account, and create a list of menu buttons."
       (:divider
        (make-pane-1 manager frame 'menu-divider-leaf-pane
                     :label name
-                    :vertical vertical
                     :client client))
       (:menu
         (make-pane-1 manager frame (if vertical
@@ -348,7 +336,6 @@ account, and create a list of menu buttons."
                                        'menu-button-submenu-pane)
 		     :label name
 		     :client client
-                     :vertical vertical
 		     :frame-manager manager
 		     :command-table value
 		     :bottomp bottomp))
@@ -359,8 +346,7 @@ account, and create a list of menu buttons."
 ;;
 (defclass menu-button-hrack-pane (hrack-pane) ())
 
-(defclass menu-bar (menu-button-hrack-pane
-                    permanent-medium-sheet-output-mixin)
+(defclass menu-bar (menu-button-hrack-pane)
   ((items :initform nil)
    (armed :initform nil)))
 
@@ -400,7 +386,7 @@ account, and create a list of menu buttons."
 	   :command-table command-table))
      (list +fill+))))
 
-(defun make-menu-bar (command-table 
+(defun make-menu-bar (command-table
 		      &key width height
 		           (max-width +fill+) max-height
 			   min-width min-height)

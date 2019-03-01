@@ -48,9 +48,14 @@ denoted by this symbol."
                 (find-symbol (string-upcase (string name))
                              (find-package "CLIM-DEMO")))))
     (if background
-        (bt:make-thread (lambda () (run-frame-top-level frame)))
+        (bt:make-thread #'(lambda () (run-frame-top-level frame))
+                        :initial-bindings `((*default-server-path* . ',*default-server-path*)))
         (run-frame-top-level frame))
     frame))
+
+(defgeneric display (frame pane)
+  (:documentation "Generic method meant to be specialized at least on hte first
+argument to avoid creating too many functions with similar name."))
 
 (define-application-frame demodemo
     () ()
@@ -89,8 +94,8 @@ denoted by this symbol."
                    (make-demo-button "Slider demo" 'sliderdemo:sliderdemo)
                    (make-demo-button "German Towns" 'town-example:town-example)
                    (make-demo-button "Data Graph Toy" 'graph-toy)
-                   ;; this demo invokes the debugger
-                   #+ (or) (make-demo-button "Traffic lights" 'traffic-lights)))
+                   (make-demo-button "Traffic lights" 'traffic-lights)
+                   (make-demo-button "Image Transform" 'image-transform-demo:image-transform-demo)))
                (labelling (:label "Tests")
                  (vertically (:equalize-width t)
                    (make-demo-button "Stream test" 'stream-test)
@@ -115,7 +120,14 @@ denoted by this symbol."
                    (make-demo-button "Tables with borders" 'table-demo)
                    (make-demo-button "Menu Test"  'menutest:menutest)
                    (make-demo-button "Drag and Drop" 'dragndrop)
-                   (make-demo-button "Pane hierarchy viewer" 'hierarchy)))))))))
+                   (make-demo-button "Pane hierarchy viewer" 'hierarchy)
+                   (make-demo-button "Patterns, designs and inks" 'pattern-design-test)
+                   (make-demo-button "Flipping ink" 'flipping-ink)
+                   (make-demo-button "Overlapping patterns" 'patterns-overlap)
+                   (make-demo-button "Text transformations" 'text-transformations-test)
+                   (make-demo-button "Text multiline positioning" 'text-multiline-positioning)
+                   (make-demo-button "SEOS baseline and wrapping" 'seos-baseline)
+                   (make-demo-button "Indentation" 'indentation)))))))))
 
 (defun demodemo ()
   (run-frame-top-level (make-application-frame 'demodemo)))
@@ -124,7 +136,7 @@ denoted by this symbol."
     () ()
     (:layouts
      (default
-         (horizontally (:background climi::*3d-normal-color*)
+         (horizontally ()
            30
            (make-pane 'push-button :label "Okay"
                       :width '(50 :mm))
@@ -211,9 +223,7 @@ denoted by this symbol."
                    5
                    (make-test-label2 :right :bottom))))))))))
 
-(defclass foo-pane (basic-pane
-                    permanent-medium-sheet-output-mixin
-                    climi::always-repaint-background-mixin)
+(defclass foo-pane (basic-pane clime:always-repaint-background-mixin)
   ())
 
 (defmethod compose-space ((pane foo-pane) &key width height)
@@ -316,18 +326,19 @@ denoted by this symbol."
 
 (define-application-frame option-test
     () ()
-    (:panes (option-pane-1 :option-pane
-                           :value 1
-                           :items '(1 2 3 4 6 7)
-                           :value-changed-callback (constantly nil))
-            (option-pane-2 :option-pane
-                           :value "Option 1"
-                           :items '("Option 1" "Option 2" "Option 3" "Option 4" "Option 6" "Option 7")
-                           :value-changed-callback (constantly nil)))
-    (:layouts
-     (:default
-         (vertically (:label "Option panes example")
-           (1/2 option-pane-1)
-           (1/2 option-pane-2)))))
+  (:panes (option-pane-1 :option-pane
+                         :value 1
+                         :items '(1 2 3 4 6 7)
+                         :value-changed-callback (constantly nil))
+          (option-pane-2 :option-pane
+                         :value "Option 1"
+                         :items '("Option 1" "Option 2" "Option 3" "Option 4" "Option 6" "Option 7")
+                         :value-changed-callback (constantly nil)))
+  (:layouts
+   (:default
+    (labelling (:label "Option panes example")
+      (vertically ()
+        (1/2 option-pane-1)
+        (1/2 option-pane-2))))))
 
 (format t "~&;; try (CLIM-DEMO:DEMODEMO)~%")

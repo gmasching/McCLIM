@@ -1,10 +1,10 @@
 ;;; -*- Mode: Lisp; Package: CLIM-INTERNALS -*-
 
 ;;;  (c) copyright 1998,1999,2000 by Michael McDonald (mikemac@mikemac.com)
-;;;  (c) copyright 2000 by 
+;;;  (c) copyright 2000 by
 ;;;           Iban Hatchondo (hatchond@emi.u-bordeaux.fr)
 ;;;           Julien Boninfante (boninfan@emi.u-bordeaux.fr)
-;;;  (c) copyright 2000, 2014 by 
+;;;  (c) copyright 2000, 2014 by
 ;;;           Robert Strandh (robert.strandh@gmail.com)
 ;;;  (c) copyright 2004 by
 ;;;           Gilbert Baumann <unk6@rz.uni-karlsruhe.de>
@@ -20,8 +20,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 (in-package :clim-internals)
@@ -70,7 +70,7 @@
 (defgeneric note-input-focus-changed (pane state)
   (:documentation "Called when a pane receives or loses the keyboard
 input focus. This is a McCLIM extension."))
-    
+
 (defclass standard-application-frame (application-frame
 				      presentation-history-mixin)
   ((port :initform nil
@@ -96,15 +96,14 @@ input focus. This is a McCLIM extension."))
 		   :initarg :current-layout
 		   :accessor frame-current-layout)
    (panes-for-layout :initform nil :accessor frame-panes-for-layout
-		     :documentation "alist of names and panes ~
+		     :documentation "alist of names and panes
                                      (as returned by make-pane)")
 
    (output-pane :initform nil
                 :accessor frame-standard-output
                 :accessor frame-error-output)
    (input-pane :initform nil
-               :accessor frame-standard-input
-               :accessor frame-query-io)
+               :accessor frame-standard-input)
    (documentation-pane :initform nil
                        :accessor frame-pointer-documentation-output)
 
@@ -130,7 +129,7 @@ input focus. This is a McCLIM extension."))
 		     :reader frame-top-level-lambda)
    (hilited-presentation :initform nil
 			 :initarg :hilited-presentation
-			 :accessor frame-hilited-presentation)   
+			 :accessor frame-hilited-presentation)
    (process :accessor frame-process :initform nil)
    (client-settings :accessor client-settings :initform nil)
    (event-queue :initarg :frame-event-queue
@@ -177,6 +176,14 @@ documentation produced by presentations.")
 		  :initarg :height
 		  :initform nil)))
 
+(defmethod frame-parent ((frame standard-application-frame))
+  (or (frame-calling-frame frame)
+      (frame-manager frame)))
+
+(defmethod frame-query-io ((frame standard-application-frame))
+  (or (frame-standard-input frame)
+      (frame-standard-output frame)))
+
 (defgeneric frame-geometry* (frame))
 
 (defmethod frame-geometry* ((frame standard-application-frame))
@@ -195,7 +202,7 @@ documentation produced by presentations.")
 			(space-requirement-width (compose-space pane))))
 	     (height (or geometry-height
 			 (and geometry-top geometry-bottom (- geometry-bottom geometry-top))
-			 (space-requirement-height (compose-space pane))))	   
+			 (space-requirement-height (compose-space pane))))
 	     ;; See if a position is wanted and return left, top.
 	     (left (or geometry-left
 		       (and geometry-right (- geometry-right geometry-width))))
@@ -203,17 +210,21 @@ documentation produced by presentations.")
 		      (and geometry-bottom (- geometry-bottom geometry-height)))))
       (values width height left top)))))
 
-;;; Support the :input-buffer initarg for compatibility with "real CLIM"
-
+;;; This method causes related frames share the same queue by default (on both
+;;; SMP and non-SMP systems). Thanks to that we have a single loop processing
+;;; events. Alternative approach is executed with window-stream frames which
+;;; have a standalone-event-loop (see panes.lisp). -- jd 2018-12-27
 (defmethod initialize-instance :after ((obj standard-application-frame)
                                        &key &allow-other-keys)
-  (when (and (frame-calling-frame obj)
-	   (null (frame-event-queue obj)))
-    (setf (frame-event-queue obj)
-	  (frame-event-queue (frame-calling-frame obj))))
   (unless (frame-event-queue obj)
+    (alexandria:when-let* ((calling-frame (frame-calling-frame obj))
+                           (calling-queue (frame-event-queue calling-frame)))
+      (setf (frame-event-queue obj) calling-queue)
+      (return-from initialize-instance))
     (setf (frame-event-queue obj)
-          (make-instance 'port-event-queue))))
+          (if *multiprocessing-p*
+              (make-instance 'concurrent-event-queue)
+              (make-instance 'simple-event-queue)))))
 
 (defmethod (setf frame-manager) (fm (frame application-frame))
   (let ((old-manager (frame-manager frame)))
@@ -230,10 +241,9 @@ documentation produced by presentations.")
 (defmethod (setf frame-current-layout) :around (name (frame application-frame))
   (unless (eql name (frame-current-layout frame))
     (call-next-method)
-    (when (frame-manager frame)
-      (generate-panes (frame-manager frame) frame)
-      (multiple-value-bind (w h) (frame-geometry* frame)
-	(layout-frame frame w h))
+    (alexandria:when-let ((fm (frame-manager frame)))
+      (generate-panes fm frame)
+      (layout-frame frame)
       (signal 'frame-layout-changed :frame frame))))
 
 (defmethod (setf frame-command-table) :around (new-command-table frame)
@@ -411,23 +421,19 @@ documentation produced by presentations.")
             (unless (or (eq redisplayp :command-loop) (eq redisplayp :no-clear))
               (setf (pane-needs-redisplay pane-object) nil))))
       (clear-pane-try-again ()
-       :report "Clear the output history of the pane and reattempt forceful redisplay"
+       :report "Clear the output history of the pane and reattempt forceful redisplay."
        (window-clear pane)
        (redisplay-frame-pane frame pane :force-p t))
       (clear-pane ()
-       :report "Clear the output history of the pane, but don't redisplay"
+       :report "Clear the output history of the pane, but don't redisplay."
        (window-clear pane))
       (skip-redisplay ()
-       :report "Skip this redisplay"))))
+       :report "Skip this redisplay."))))
 
 (defmethod run-frame-top-level ((frame application-frame)
 				&key &allow-other-keys)
   (letf (((frame-process frame) (current-process)))
-    (handler-case
-	(funcall (frame-top-level-lambda frame) frame)
-      (frame-exit ()
-	nil))))
-
+    (funcall (frame-top-level-lambda frame) frame)))
 
 (defmethod run-frame-top-level :around ((frame application-frame) &key)
   (let ((*application-frame* frame)
@@ -453,12 +459,13 @@ documentation produced by presentations.")
 			       (with-input-focus (query-io)
 				 (call-next-method))
 			       (call-next-method)))
-		 (frame-layout-changed () nil)))
-      (let ((fm (frame-manager frame)))
-        (case original-state
-          (:disabled
-           (disable-frame frame))
-          (:disowned
+		 (frame-layout-changed () nil)
+                 (frame-exit ()	(return))))
+      (case original-state
+        (:disabled
+         (disable-frame frame))
+        (:disowned
+         (when-let ((fm (frame-manager frame)))
            (disown-frame fm frame)))))))
 
 (defparameter +default-prompt-style+ (make-text-style :sans-serif :bold :normal))
@@ -473,56 +480,50 @@ documentation produced by presentations.")
            'command-line-read-remaining-arguments-for-partial-command)
           (prompt "Command: "))
   ;; Give each pane a fresh start first time through.
-  (let ((first-time t))
+  (let ((needs-redisplay t)
+        (first-time t))
     (loop
        ;; The variables are rebound each time through the loop because the
        ;; values of frame-standard-input et al. might be changed by a command.
-       (let* ((*standard-input*  (or (frame-standard-input frame)
-                                     *standard-input*))
-              (*standard-output* (or (frame-standard-output frame)
-                                     *standard-output*))
-              (query-io  (frame-query-io frame))
-              (*query-io* (or query-io *query-io*))
-              (*pointer-documentation-output*
-               (frame-pointer-documentation-output frame))
+       ;;
+       ;; We rebind *QUERY-IO* ensuring variable is always a stream,
+       ;; but we use FRAME-QUERY-IO for our own actions and to decide
+       ;; whenever frame has the query IO stream associated with it..
+       (let* ((frame-query-io (frame-query-io frame))
+              (interactorp (typep frame-query-io 'interactor-pane))
+              (*standard-input*  (or (frame-standard-input frame)  *standard-input*))
+              (*standard-output* (or (frame-standard-output frame) *standard-output*))
+              (*query-io* (or frame-query-io *query-io*))
               ;; during development, don't alter *error-output*
               ;; (*error-output* (frame-error-output frame))
+              (*pointer-documentation-output* (frame-pointer-documentation-output frame))
               (*command-parser* command-parser)
               (*command-unparser* command-unparser)
-              (*partial-command-parser* partial-command-parser)
-              (interactorp (typep *query-io* 'interactor-pane)))
+              (*partial-command-parser* partial-command-parser))
          (restart-case
-             (progn
-               (redisplay-frame-panes frame :force-p first-time)
-               (setq first-time nil)
-               (if query-io
-                   ;; For frames with an interactor:
-                   (progn
-                     ;; Hide cursor, so we don't need to toggle it during
-                     ;; command output.
-                     (setf (cursor-visibility (stream-text-cursor *query-io*))
-                           nil)
-                     (when (and prompt interactorp)
-                       (with-text-style (*query-io* +default-prompt-style+)
-                         (if (stringp prompt)
-                             (write-string prompt *query-io*)
-                             (funcall prompt *query-io* frame))
-                         (force-output *query-io*)))
-                     (let ((command (read-frame-command frame
-                                                        :stream *query-io*)))
-                       (when interactorp
-                         (fresh-line *query-io*))
-                       (when command
-                         (execute-frame-command frame command))
-                       (when interactorp
-                         (fresh-line *query-io*))))
-                   ;; Frames without an interactor:
-                   (let ((command (read-frame-command frame :stream nil)))
-                     (when command (execute-frame-command frame command)))))
+             (flet ((execute-command ()
+                      (when-let ((command (read-frame-command frame :stream frame-query-io)))
+                        (setq needs-redisplay t)
+                        (execute-frame-command frame command))))
+               (when needs-redisplay
+                 (redisplay-frame-panes frame :force-p first-time)
+                 (setq first-time nil
+                       needs-redisplay nil))
+               (when interactorp
+                 (setf (cursor-visibility (stream-text-cursor frame-query-io)) nil)
+                 (when prompt
+                   (with-text-style (frame-query-io +default-prompt-style+)
+                     (if (stringp prompt)
+                         (write-string prompt frame-query-io)
+                         (funcall prompt frame-query-io frame))
+                     (force-output frame-query-io))))
+               (execute-command)
+               (when interactorp
+                 (fresh-line frame-query-io)))
            (abort ()
-             :report "Return to application command loop"
+             :report "Return to application command loop."
              (if interactorp
-                 (format *query-io* "~&Command aborted.~&")
+                 (format frame-query-io "~&Command aborted.~&")
                  (beep))))))))
 
 (defmethod read-frame-command :around ((frame application-frame)
@@ -560,13 +561,13 @@ documentation produced by presentations.")
   ;; *application-frame* to decide, which process processes which
   ;; frames command loop. Perhaps looking ath the process slot?
   ;; --GB 2005-11-28
+  (check-type command cons)
   (cond ((eq *application-frame* frame)
          (restart-case
              (apply (command-name command) (command-arguments command))
            (try-again ()
             :report (lambda (stream)
-                      (format stream "Try executing the command ~A again"
-                              (command-name command)))
+                      (format stream "Try executing the command ~S again." (command-name command)))
             (execute-frame-command frame command))))
         (t
          (let ((eq (sheet-event-queue (frame-top-level-sheet frame))))
@@ -622,26 +623,26 @@ documentation produced by presentations.")
   (setf (frame-manager frame) fm)
   (setf (port frame) (port fm))
   (setf (graft frame) (find-graft :port (port frame)))
-  (let* ((*application-frame* frame)
-	 (t-l-s (make-pane-1 fm frame 'top-level-sheet-pane
-			     :name 'top-level-sheet
-			     ;; enabling should be left to enable-frame
-			     :enabled-p nil))
-         #+clim-mp (event-queue (sheet-event-queue t-l-s)))
-    (setf (slot-value frame 'top-level-sheet) t-l-s)
+  (let ((*application-frame* frame)
+        (event-queue (frame-event-queue frame)))
+    (setf (slot-value frame 'top-level-sheet)
+          (make-pane-1 fm frame 'top-level-sheet-pane
+                       :name 'top-level-sheet
+                       ;; sheet is enabled from enable-frame
+                       :enabled-p nil))
     (generate-panes fm frame)
     (setf (slot-value frame 'state) :disabled)
-    #+clim-mp
-    (when (typep event-queue 'port-event-queue)
+    (when (typep event-queue 'event-queue)
       (setf (event-queue-port event-queue) (port fm)))
     frame))
 
 (defmethod disown-frame ((fm frame-manager) (frame application-frame))
-  #+CLIM-MP
-  (let* ((t-l-s (frame-top-level-sheet frame))
-         (queue (sheet-event-queue t-l-s)))
-    (when (typep queue 'port-event-queue)
-      (setf (event-queue-port queue) nil)))
+                                        ;#+clim-mp
+  (alexandria:when-let* ((event-queue (frame-event-queue frame))
+                         (calling-frame (frame-calling-frame frame))
+                         (calling-queue (frame-event-queue calling-frame))
+                         (another-queue-p (not (eql calling-queue event-queue))))
+    (setf (event-queue-port event-queue) nil))
   (setf (slot-value fm 'frames) (remove frame (slot-value fm 'frames)))
   (sheet-disown-child (graft frame) (frame-top-level-sheet frame))
   (setf (%frame-manager frame) nil)
@@ -711,7 +712,7 @@ documentation produced by presentations.")
   (setf (slot-value pane 'name) name)
   pane)
 
-(defun do-pane-creation-form (name form)  
+(defun do-pane-creation-form (name form)
   (cond
     ;; Single form which is a function call
     ((and (= (length form) 1)
@@ -828,7 +829,7 @@ documentation produced by presentations.")
 	(disabled-commands nil)
 	(command-definer t)
 	(top-level '(default-frame-top-level))
-	(others nil)	
+	(others nil)
 	(pointer-documentation nil)
 	(geometry nil)
 	(user-default-initargs nil)
@@ -848,7 +849,7 @@ documentation produced by presentations.")
 	     (:pointer-documentation (setq pointer-documentation (car values)))
 	     (:geometry (setq geometry values))
 	     (:default-initargs (setq user-default-initargs values))
-	     (t (push (cons prop values) others))))    
+	     (t (push (cons prop values) others))))
     (when (eq command-definer t)
       (setf command-definer
             (intern (concatenate 'string
@@ -1148,7 +1149,7 @@ frames and will not have focus.
 ;;; presentations -- menu choices, for example -- could influence pointer
 ;;; documentation window.
 
-(defgeneric frame-compute-pointer-documentation-state 
+(defgeneric frame-compute-pointer-documentation-state
     (frame input-context stream event)
   (:documentation
    "Compute a state object that will be used to generate pointer documentation."))
@@ -1641,16 +1642,18 @@ have a `pointer-documentation-pane' as pointer documentation,
 		   do (return-from find-dest-translator translator))
 	     nil)
 	   (do-feedback (window x y state)
-	     (funcall feedback-fn frame from-presentation window
-			initial-x initial-y x y state))
+             (when (and feedback-activated window)
+               (funcall feedback-fn frame from-presentation window
+		        initial-x initial-y x y state)))
 	   (do-hilite (presentation window state)
-	     (funcall hilite-fn frame presentation window state))
-	   (last-window ()
-	     (event-sheet last-event))
-	   (last-x ()
-	     (pointer-event-x last-event))
-	   (last-y ()
-	     (pointer-event-y last-event)))
+             (when (and presentation hilite-fn)
+               (funcall hilite-fn frame presentation window state)))
+	   (last-point ()
+	     (if last-event
+                 (values (event-sheet last-event)
+                         (pointer-event-x last-event)
+                         (pointer-event-y last-event))
+                 (values nil nil nil))))
       ;; :highlight nil will cause the presentation that is the source of the
       ;; dragged object to be unhighlighted initially.
       (block do-tracking
@@ -1661,27 +1664,30 @@ have a `pointer-documentation-pane' as pointer documentation,
 	  (:presentation (&key presentation window event x y)
 	    (let ((dest-translator (find-dest-translator presentation window
 							 x y)))
-	      (when feedback-activated
-		(do-feedback (last-window) (last-x) (last-y) :unhighlight))
+	      (multiple-value-call #'do-feedback (last-point) :unhighlight)
 	      (setq feedback-activated t
 		    last-event event)
-	      (when last-presentation
-		(do-hilite last-presentation (last-window) :unhighlight))
-	      (setq last-presentation presentation
-		    feedback-fn (feedback dest-translator)
-		    hilite-fn (highlighting dest-translator))
+	      (do-hilite last-presentation (last-point) :unhighlight)
+	      (setf last-presentation presentation
+                    (values feedback-fn hilite-fn)
+                    (if dest-translator
+                        (values (feedback dest-translator)
+                                (highlighting dest-translator))
+                        (values #'frame-drag-and-drop-feedback
+                                nil)))
 	      (do-hilite presentation window :highlight)
 	      (do-feedback window x y :highlight)
-	      (document-drag-n-drop dest-translator presentation
-				    context-type frame event window
-				    x y)))
+	      (multiple-value-call #'document-drag-n-drop
+                (if dest-translator
+                    (values dest-translator presentation)
+                    (values translator      nil))
+	        context-type frame event window
+	        x y)))
 	  (:pointer-motion (&key event window x y)
-	    (when feedback-activated
-	      (do-feedback (last-window) (last-x) (last-y) :unhighlight))
+	    (multiple-value-call #'do-feedback (last-point) :unhighlight)
 	    (setq feedback-activated t
 		  last-event event)
-	    (when last-presentation
-	      (do-hilite last-presentation (last-window) :unhighlight))
+	    (do-hilite last-presentation (last-point) :unhighlight)
 	    (setq last-presentation nil)
 	    (do-feedback window x y :highlight)
 	    (document-drag-n-drop translator nil
@@ -1700,15 +1706,14 @@ have a `pointer-documentation-pane' as pointer documentation,
       ;;
       ;; XXX Assumes x y from :button-release are the same as for the preceding
       ;; button-motion; is that correct?
-      (when feedback-activated
-	(do-feedback (last-window) (last-x) (last-y) :unhighlight))
-      (when last-presentation
-	(do-hilite last-presentation (last-window) :unhighlight))
+      (multiple-value-call #'do-feedback (last-point) :unhighlight)
+      (do-hilite last-presentation (last-point) :unhighlight)
+      (when-let ((stream *pointer-documentation-output*))
+        (window-clear stream))
+
       (if destination-presentation
-	  (let ((final-translator (find-dest-translator destination-presentation
-							(last-window)
-							(last-x)
-							(last-y))))
+	  (let ((final-translator (multiple-value-call #'find-dest-translator
+                                    destination-presentation (last-point))))
 	    (if final-translator
 		(funcall (destination-translator final-translator)
 			 *dragged-object*
@@ -1727,24 +1732,21 @@ have a `pointer-documentation-pane' as pointer documentation,
 
 (defun document-drag-n-drop
     (translator presentation context-type frame event window x y)
-  (when *pointer-documentation-output*
-    (let ((s *pointer-documentation-output*))
-      (window-clear s)
-      (with-end-of-page-action (s :allow)
-	(with-end-of-line-action (s :allow)
-	  (funcall (pointer-documentation translator)
-	   *dragged-object*
-	   :presentation *dragged-presentation*
-	   :destination-object (and presentation
-				    (presentation-object presentation))
-	   :destination-presentation presentation
-	   :context-type context-type
-	   :frame frame
-	   :event event
-	   :window window
-	   :x x
-	   :y y
-	   :stream s))))))
-
-
-
+  (when-let ((stream *pointer-documentation-output*))
+    (let ((function (pointer-documentation translator)))
+      (window-clear stream)
+      (with-end-of-page-action (stream :allow)
+        (with-end-of-line-action (stream :allow)
+          (funcall function
+                   *dragged-object*
+                   :presentation *dragged-presentation*
+                   :destination-object (and presentation
+                                            (presentation-object presentation))
+                   :destination-presentation presentation
+                   :context-type context-type
+                   :frame frame
+                   :event event
+                   :window window
+                   :x x
+                   :y y
+                   :stream stream))))))

@@ -114,40 +114,111 @@
                                        (pdf:stroke)))))
                              position-seq))))
 
+(defun clamp-minus2pi-to-2pi (theta)
+  (let ((sign (signum theta))
+        (new-angle (rem theta (* pi 2))))
+    (if (zerop new-angle)
+        (* sign (* pi 2))
+        new-angle)))
+
+(defun clamp-zero-to-2pi (theta)
+  (let ((sign (signum theta))
+        (new-angle (mod theta (* pi 2))))
+    (if (zerop new-angle)
+        (* (abs sign) (* pi 2))
+        new-angle)))
+
 (defun put-ellipse (center-x center-y
-                    radius1-dx radius1-dy radius2-dx radius2-dy
-                    start-angle end-angle filled)
-  (declare (ignore start-angle end-angle filled))
-  (let* ((kappa (* 4 (/ (- (sqrt 2) 1) 3.0)))
-         (radius-dx (abs (+ radius1-dx radius2-dx)))
-         (radius-dy (abs (+ radius1-dy radius2-dy))))
-    (pdf:move-to (+ center-x radius-dx) center-y)
-    (pdf:bezier-to (+ center-x radius-dx) (+ center-y (* kappa radius-dy))
-                   (+ center-x (* kappa radius-dx)) (+ center-y radius-dy)
-                   center-x (+ center-y radius-dy))
-    (pdf:bezier-to (- center-x (* kappa radius-dx)) (+ center-y radius-dy)
-                   (- center-x radius-dx) (+ center-y (* kappa radius-dy))
-                   (- center-x radius-dx) center-y)
-    (pdf:bezier-to (- center-x radius-dx) (- center-y (* kappa radius-dy))
-                   (- center-x (* kappa radius-dx)) (- center-y radius-dy)
-                   center-x (- center-y radius-dy))
-    (pdf:bezier-to (+ center-x (* kappa radius-dx)) (- center-y radius-dy)
-                   (+ center-x radius-dx) (- center-y (* kappa radius-dy))
-                   (+ center-x radius-dx) center-y)))
+                    a b theta
+                    start-angle end-angle tr filled)
+  "Calls cl-pdf routines to draw a series of cubic bezier curves that
+approximate the ellipse having its center at CENTER-X, CENTER-Y, radii
+A and B angle angle to the postiive x axis theta. If start-angle and
+end-angle are NIL and filled is T, then a solid ellipse is drawn. If
+START-ANGLE and END-ANGLE are specified, draws an ellipse arc between
+the two angles, or a pie-wedge if filled is T."
+  (let ((first-segment t))
+    (flet ((draw-ellipse-segment (lambda1 lambda2)
+             (multiple-value-bind (p1x p1y q1x q1y q2x q2y p2x p2y)
+                 (ellipse-cubic-bezier-points lambda1 lambda2
+                                              center-x center-y
+                                              a b theta)
+               (with-transformed-position (tr p1x p1y)
+                 (with-transformed-position (tr q1x q1y)
+                   (with-transformed-position (tr q2x q2y)
+                     (with-transformed-position (tr p2x p2y)
+                       (when first-segment
+                         (pdf:move-to p1x p1y)
+                         (setf first-segment nil))
+                       (pdf:bezier-to q1x q1y q2x q2y p2x p2y))))))))
+      (if (or (and start-angle end-angle
+                   (zerop start-angle) (= (* pi 2) end-angle))
+              (and start-angle end-angle
+                   (zerop end-angle) (= (* pi 2) start-angle)))
+          (let* ((sweep (* pi 2))
+                 (steps 16)
+                 (step (/ sweep steps)))
+            (let ((seg-start-angle 0)
+                  (seg-end-angle (+ start-angle step)))
+              (loop for i below steps
+                 do (draw-ellipse-segment seg-start-angle seg-end-angle)
+                   (incf seg-start-angle step)
+                   (incf seg-end-angle step))))
+          ;; our bezier approximation of ellipse code treats the 0
+          ;; angle as being parallel to theta, and the angles go
+          ;; counter-clockwise in a :first-quadrant t sense, but
+          ;; McCLIM wants 0 to be parallel to positive X axis, and the
+          ;; angles to go CCW in a :first-quadrant nil sense so we
+          ;; need to:
+          ;; 1. swap end-angle and start-angle
+          ;; 2. subtract minus theta from both start-angle and end-angle.
+          ;; 3. reverse the signs
+          ;; that reduces to:
+          (let ((start-angle (- (+ end-angle theta)))
+                (end-angle (- (+ start-angle theta))))
+            ;; sweep can be positive or negative, but let's
+            ;; limit it to the range [-2pi 2pi] so we don't loop
+            ;; here.
+            (let* ((sweep (clamp-minus2pi-to-2pi (- end-angle start-angle)))
+                   ;; and let's limit start angle to be be [0 2pi]
+                   (start-angle (clamp-zero-to-2pi start-angle)))
+              (unless (zerop sweep)
+                (let* ((segment-count (ceiling (abs (/ sweep (/ pi 4)))))
+                       (step (/ sweep segment-count)))
+                  (let ((seg-start-angle start-angle)
+                        (seg-end-angle (+ start-angle step)))
+                    (loop for i below segment-count
+                       do (draw-ellipse-segment seg-start-angle
+                                                seg-end-angle)
+                         (incf seg-start-angle step)
+                         (incf seg-end-angle step))))))))
+      (when filled
+        (with-transformed-position (tr center-x center-y)
+          (pdf:line-to center-x center-y))))))
+
+(defun put-ellipse* (center-x center-y
+                     radius1-dx radius1-dy radius2-dx radius2-dy
+                     start-angle end-angle tr filled)
+  "Calls cl-pdf routines to draw a series of cubic bezier curves that
+approximate the ellipse having its center at CENTER-X, CENTER-Y, with
+two radii described by RADIUS1-DX, RADIUS1-DY and RADIUS2-DX,
+RADIUS2-DY. If start-angle and end-angle are NIL and filled is T, then
+a solid ellipse is drawn. If START-ANGLE and END-ANGLE are specified,
+draws an ellipse arc between the two angles, or a pie-wedge if filled
+is T."
+  (multiple-value-bind (a b theta)
+      (reparameterize-ellipse radius1-dx radius1-dy radius2-dx radius2-dy)
+    (put-ellipse center-x center-y a b theta start-angle end-angle tr filled)))
 
 (defmethod medium-draw-ellipse* ((medium pdf-medium) center-x center-y
                                  radius1-dx radius1-dy radius2-dx radius2-dy
                                  start-angle end-angle filled)
-  (unless (or (= radius2-dx radius1-dy 0) (= radius1-dx radius2-dy 0))
-    (error "PDF Backend MEDIUM-DRAW-ELLIPSE* not yet implemented for
-    non axis-aligned ellipses."))
   (pdf:with-saved-state
     (let ((tr (sheet-native-transformation (medium-sheet medium))))
       (pdf-actualize-graphics-state medium :line-style :color)
-      (with-transformed-position (tr center-x center-y)
-        (put-ellipse center-x center-y
-                     radius1-dx radius1-dy radius2-dx radius2-dy
-                     start-angle end-angle filled))
+      (put-ellipse* center-x center-y
+                    radius1-dx radius1-dy radius2-dx radius2-dy
+                    start-angle end-angle tr filled)
       (if filled
           (pdf:close-fill-and-stroke)
           (pdf:stroke)))))
@@ -170,35 +241,36 @@
 (defmethod medium-draw-text* ((medium pdf-medium) string x y
                               start end
                               align-x align-y
-                              toward-x toward-y transform-glyphs
-                              transformation)
-  (multiple-value-bind (x y)
-      (transform-position transformation x y)
-    (pdf:with-saved-state
-      (pdf:in-text-mode
-        (pdf-actualize-graphics-state medium :text-style :color)
-        (let ((tr (sheet-native-transformation (medium-sheet medium))))
-          (multiple-value-bind (total-width total-height
-                                final-x final-y baseline)
-              (let* ((font-name (medium-font medium))
-                     (font (clim-postscript-font:font-name-metrics-key font-name))
-                     (size (clim-postscript-font:font-name-size font-name)))
-                (clim-postscript-font:text-size-in-font font size string 0 nil))
-            (declare (ignore final-x final-y))
-            (let  ((x (ecase align-x
-                        (:left x)
-                        (:center (- x (/ total-width 2)))
-                        (:right (- x total-width))))
-                   (y (ecase align-y
-                        (:baseline y)
-                        (:top (+ y baseline))
-                        (:center (- y (- (/ total-height 2)
-                                         baseline)))
-                        (:bottom (- y (- total-height baseline))))))
-              (with-transformed-position (tr x y)
-                (pdf:move-text x y)
-                (pdf:draw-text string)))))))))
-
+                              toward-x toward-y transform-glyphs)
+  (pdf:with-saved-state
+    (pdf:in-text-mode
+      (pdf-actualize-graphics-state medium :text-style :color)
+      (let ((sheet-transformation (sheet-native-transformation (medium-sheet medium)))
+            (medium-transformation (medium-transformation medium)))
+        (multiple-value-bind (total-width total-height
+                                          final-x final-y baseline)
+            (let* ((font-name (medium-font medium))
+                   (font (clim-postscript-font:font-name-metrics-key font-name))
+                   (size (clim-postscript-font:font-name-size font-name)))
+              (clim-postscript-font:text-size-in-font font size string 0 nil))
+          (declare (ignore final-x final-y))
+          (let  ((x (ecase align-x
+                      (:left x)
+                      (:center (- x (/ total-width 2)))
+                      (:right (- x total-width))))
+                 (y (ecase align-y
+                      (:baseline y)
+                      (:top (+ y baseline))
+                      (:center (- y (- (/ total-height 2)
+                                       baseline)))
+                      (:bottom (- y (- total-height baseline))))))
+            (multiple-value-bind (mxx mxy myx myy tx ty)
+                (climi::get-transformation
+                 (clim:compose-transformations sheet-transformation
+                                               medium-transformation))
+              (pdf:set-transform-matrix mxx mxy myx myy tx ty))
+            (pdf:set-text-matrix 1 0 0 -1 x y)
+            (pdf:draw-text string)))))))
 
 ;;; Postscript path functions
 
@@ -291,24 +363,25 @@
 
 (defconstant +normal-line-width+ (/ 2.0 3.0))
 
-(defun line-style-scale (line-style)
+(defun line-style-scale (line-style medium)
   (let ((unit (line-style-unit line-style)))
     (ecase unit
       (:normal +normal-line-width+)
       (:point 1)
-      (:coordinate (error ":COORDINATE line unit is not implemented.")))))
+      (:coordinate (multiple-value-bind (x y)
+                       (transform-distance (medium-transformation medium) 0.71 0.71)
+                     (sqrt (+ (expt x 2) (expt y 2))))))))
 
-(defmethod line-style-effective-thickness
-    (line-style (medium pdf-medium))
+(defmethod line-style-effective-thickness (line-style (medium pdf-medium))
   (* (line-style-thickness line-style)
-     (line-style-scale line-style)))
+     (line-style-scale line-style medium)))
 
 (defun medium-line-thickness (medium)
   (line-style-effective-thickness (medium-line-style medium) medium))
 
 (defmethod pdf-set-graphics-state (medium (kind (eql :line-style)))
   (let* ((line-style (medium-line-style medium))
-         (scale (line-style-scale line-style)))
+         (scale (line-style-scale line-style medium)))
     (pdf:set-line-width (* scale (line-style-thickness line-style)))
     (pdf:set-line-join (getf +pdf-line-joints+
                              (line-style-joint-shape line-style)))
@@ -320,11 +393,15 @@
 ;;; Color
 (defgeneric medium-color-rgb (medium ink))
 
-(defmethod medium-color-rgb (medium (ink (eql +foreground-ink+)))
-  (medium-color-rgb medium (medium-foreground medium)))
-
-(defmethod medium-color-rgb (medium (ink (eql +background-ink+)))
-  (medium-color-rgb medium (medium-background medium)))
+(defmethod medium-color-rgb (medium (ink clime:indirect-ink))
+  ;; If foreground/background doesn't resolve properly it is a bug in core
+  ;; system. We could have masked it with the following code. --jd 2018-09-27
+  #+ (or)
+  (alexandria:switch (ink)
+    (+foreground-ink+ (medium-color-rgb (medium-foreground medium)))
+    (+background-ink+ (medium-color-rgb (medium-background medium)))
+    (otherwise (medium-color-rgb (clime:indirect-ink-ink ink))))
+  (medium-color-rgb medium (clime:indirect-ink-ink ink)))
 
 (defmethod medium-color-rgb (medium (ink color))
   (declare (ignore medium))
@@ -361,7 +438,8 @@
        (unless font-info
          (error "Unknown font: ~S" font-info))
        (clim-postscript-font:font-info-name font-info)))
-    (cons (coerce (car font-name) 'string))))
+    (clim-postscript-font:postscript-font-name
+     (clim-postscript-font:font-name-name font-name))))
 
 (defmethod pdf-set-graphics-state (medium (kind (eql :text-style)))
   (let* ((font-name (medium-font medium))

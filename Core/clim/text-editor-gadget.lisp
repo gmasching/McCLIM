@@ -125,7 +125,6 @@
   (:documentation "The class for Drei-based text editor substrates."))
 
 (defmethod compose-space ((pane drei-text-editor-substrate) &key width height)
-  (declare (ignore height))
   (with-sheet-medium (medium pane)
     (let* ((text-style (medium-text-style medium))
            (line-height (+ (text-style-height text-style medium)
@@ -138,12 +137,12 @@
                          width))
               (height (if nlines
                           (+ (* nlines line-height))
-                          line-height)))
+                          height)))
           (space-requirement-combine* #'(lambda (req1 req2)
                                           (or req2 req1))
                                       (call-next-method)
-                                      :width width :max-width width :min-width width
-                                      :height height :max-height height :min-height height))))))
+                                      :width width :max-width width :min-width column-width
+                                      :height height :max-height height :min-height line-height))))))
 
 (defmethod allocate-space ((pane drei-text-editor-substrate) w h)
   (resize-sheet pane w h))
@@ -152,10 +151,8 @@
 
 (defclass editor-substrate-user-mixin (value-gadget)
   ((substrate :accessor substrate
-              :documentation "The editing substrate used for this
-text field."))
-  (:documentation "A mixin class for creating gadgets using
-editor substrates."))
+              :documentation "The editing substrate used for this text field."))
+  (:documentation "A mixin class for creating gadgets using editor substrates."))
 
 (defmethod gadget-value ((gadget editor-substrate-user-mixin))
   (gadget-value (substrate gadget)))
@@ -169,7 +166,8 @@ editor substrates."))
 ;;;  30.4.8 The concrete text-field Gadget
 
 (defclass text-field-pane (text-field
-                           vrack-pane editor-substrate-user-mixin)
+                           vrack-pane
+                           editor-substrate-user-mixin)
   ((activation-gestures :accessor activation-gestures
                         :initarg :activation-gestures
                         :documentation "A list of gestures that
@@ -205,7 +203,8 @@ cause the activate callback to be called."))
 ;;;  30.4.9 The concrete text-editor Gadget
 
 (defclass text-editor-pane (text-editor
-                            vrack-pane editor-substrate-user-mixin)
+                            vrack-pane
+                            editor-substrate-user-mixin)
   ()
   (:default-initargs :activation-gestures '()))
 

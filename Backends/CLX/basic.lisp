@@ -34,16 +34,7 @@
    (font-families :initform nil :accessor font-families)
    (cursor-table :initform (make-hash-table :test #'eq)
                  :accessor clx-port-cursor-table)
-   (pointer :reader port-pointer)
-   (font-renderer :initarg :font-renderer
-                  :reader clx-port-font-renderer)))
-
-(defmethod initialize-instance :after ((obj clx-basic-port) &key)
-  (let ((renderer (getf (cdr (port-server-path obj)) :font-renderer)))
-    (setf (slot-value obj 'font-renderer)
-          (if (symbolp renderer)
-              (make-instance renderer)
-              renderer))))
+   (pointer :reader port-pointer)))
 
 (defclass clx-basic-pointer (standard-pointer)
   ((cursor :accessor pointer-cursor :initform :upper-left)))
@@ -70,7 +61,7 @@
 			  &rest args
 			  &key major asynchronous &allow-other-keys)
   (warn "Received CLX ~A (~A) in process ~W for display ~W."
-        error-name major (bt:thread-name (bt:current-thread)) display)
+        error-name major (clim-sys:process-name (clim-sys:current-process)) display)
   ;; We ignore all asynchronous errors to keep the connection.
   ;; 42 is SetInputFocus, we ignore match-errors from that.
   (unless (or asynchronous

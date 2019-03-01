@@ -16,8 +16,8 @@
 ;;; Library General Public License for more details.
 ;;;
 ;;; You should have received a copy of the GNU Library General Public
-;;; License along with this library; if not, write to the 
-;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330, 
+;;; License along with this library; if not, write to the
+;;; Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 ;;; Boston, MA  02111-1307  USA.
 
 ;;;; Some Notes
@@ -36,7 +36,7 @@
 ;;; compose-in and compose-out is thought as to be drawn with
 ;;; +foreground-ink+ = +background-ink+ = +black+.
 ;;;
-;;; But Is (make-opacity 1) really the same as +foreground-ink+? 
+;;; But Is (make-opacity 1) really the same as +foreground-ink+?
 ;;;     Or: Is
 ;;;         (compose-in D +foreground-ink+) different from
 ;;;         (compose-in D (make-opacity 1))?
@@ -72,17 +72,60 @@
 ;;; --GB
 
 ;;;; Design Protocol
-
 ;;;
 ;;; DRAW-DESIGN already is all you need for a design protocol.
 ;;;
 ;;; --GB
+;;;
+;;;
+
+;;;
+;;;   EFFECTIVE-TRANSFORMED-DESIGN design                             [function]
+;;;
+;;;      Returns a transformed design with all transformations collapset into a
+;;;      single transformation and a design being the source pattern. If
+;;;      resulting transformation is an identity returns source pattern
+;;;      itself. If function is called with a pattern which is not transformed
+;;;      that pattern is returned.
+;;;
+;;;
+;;;   DESIGN-INK design x y                                           [method]
+;;;
+;;;      Returns ink at position X, Y. If DESIGN is uniform then it is
+;;;      returned. If DESIGN is not defined for the specified coordinates (i.e
+;;;      for array pattern they are out of bounds), +TRANSPARENT-INK+ is
+;;;      returned.
+;;;
+;;;
+;;;   COLOR-RGBA design                                               [method]
+;;;
+;;;      Like COLOR-RGB but works also on UNIFORM-COMPOSITUM and OPACITY.
+;;;      Returns four values: red, green, blue and opacity. Each is a float
+;;;      between 0.0 and 1.0.
+;;;
+;;;
+;;;   INDIRECT-INK                                                    [class]
+;;;   INDIRECT-INK-P ink                                              [predicate]
+;;;   INDIRECT-INK-INK ink                                            [function]
+;;;
+;;;      Indirect inks are underspecified in the standard. Class is exported for
+;;;      specialization. Predicate INDIRECT-INK-P is defined. Initargs:
+;;;
+;;;      SYMBOL is dynamically read with SYMBOL-VALUE when function
+;;;       INDIRECT-INK-INK is called. It should be bound to an ink. This is
+;;;       internal interface. There is no guarantee for infinite recursion
+;;;       protection, so if dynamic variable is bound to ink referring results
+;;;       are not specified.
+;;;
+;;;      DEFAULT ink used if symbol is not bound.
 
 (in-package :clim-internals)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defgeneric color-rgb (color))
+(defgeneric color-rgba (color))
+(defgeneric design-ink (design x y))
 
 (defmethod print-object ((color color) stream)
   (print-unreadable-object (color stream :identity nil :type t)
@@ -104,6 +147,14 @@
 (defmethod color-rgb ((color standard-color))
   (with-slots (red green blue) color
     (values red green blue)))
+
+(defmethod color-rgba ((color standard-color))
+  (with-slots (red green blue) color
+    (values red green blue 1.0)))
+
+(defmethod design-ink ((color standard-color) x y)
+  (declare (ignore x y))
+  color)
 
 (defclass named-color (standard-color)
   ((name :initarg :name
@@ -198,50 +249,33 @@
 (defun make-ihs-color (i h s)
   (multiple-value-call #'make-rgb-color (ihs-to-rgb i h s)))
 
+;;;
+;;; 13.3.2 Contrasting Colors
+;;;
+
+(defconstant +contrasting-colors+
+  (vector (make-named-color "Contrasting1" 0.0        0.44705883  0.7411765)
+          (make-named-color "Contrasting2" 0.8509804  0.3254902   0.09803922)
+          (make-named-color "Contrasting3" 0.92941177 0.69411767  0.1254902)
+          (make-named-color "Contrasting4" 0.49411765 0.18431373  0.5568628)
+          (make-named-color "Contrasting5" 0.46666667 0.6745098   0.1882353)
+          (make-named-color "Contrasting6" 0.3019608  0.74509805  0.93333334)
+          (make-named-color "Contrasting7" 0.63529414 0.078431375 0.18431373)
+          (make-named-color "Contrasting8" 0.53529414 0.378431375 0.38431373)))
+
+(defmethod contrasting-inks-limit (port)
+  (length +contrasting-colors+))
+
 (defun make-contrasting-inks (n &optional k)
-  ;; Look +contrasting-colors+ up at runtime, because it has not yet
-  ;; been declared when this is compiled.
-  (let ((contrasting-colors (symbol-value '+contrasting-colors+)))
-    (if (> n (length contrasting-colors))
-        (error "The argument N is out of range [1-~D]" (length contrasting-colors)))
+  (let ((contrasting-colors +contrasting-colors+))
+    (unless (<= 1 n (length contrasting-colors))
+      (error "The argument N = ~D is out of range [1, ~D]"
+             n (length contrasting-colors)))
+    (unless (or (null k) (<= 0 k (1- n)))
+      (error "The argument K = ~D is out of range [0, ~D]" k (1- n)))
     (if (null k)
         (subseq contrasting-colors 0 n)
         (aref contrasting-colors k))))
-
-#||
-;;; I used this function to generate the predefined colors and names - mikemac@mikemac.com
-
-(defun generate-named-colors ()
-  (with-open-file (out "X11-colors.lisp" :direction :output :if-exists :supersede)
-    (with-open-file (in "/usr/X11/lib/X11/rgb.txt" :direction :input)
-      (format out ";;; -*- Mode: Lisp; Package: CLIM-INTERNALS -*-~%~%")
-      (format out "(in-package :clim-internals)~%~%")
-      (loop with names = nil
-	  for line = (read-line in nil nil)
-	  until (null line)
-	  do (if (eql (aref line 0) #\!)
-		 (format out ";~A~%" (subseq line 1))
-	       (multiple-value-bind (red index)
-		   (parse-integer line :start 0 :junk-allowed t)
-		 (multiple-value-bind (green index)
-		     (parse-integer line :start index :junk-allowed t)
-		   (multiple-value-bind (blue index)
-		       (parse-integer line :start index :junk-allowed t)
-		     (let ((name (substitute #\- #\Space (string-trim '(#\Space #\Tab #\Newline) (subseq line index)))))
-		       (format out "(defconstant +~A+ (make-named-color ~S ~,4F ~,4F ~,4F))~%" name name (/ red 255.0) (/ green 255.0) (/ blue 255.0))
-		       (setq names (nconc names (list name))))))))
-	  finally (format out "~%(defconstant +contrasting-colors+ (vector +black+ +red+ +green+ +blue+ +cyan+ +magenta+ +yellow+ +white+))~%~%")
-		  (format out "(eval-when (eval compile load)~%  (export '(")
-		  (loop for name in names
-		      for count = 1 then (1+ count)
-		      do (format out "+~A+ " name)
-			 (when (= count 4)
-			   (format out "~%            ")
-			   (setq count 0)))
-		  (format out "~%           )))~%")
-	     ))))
-
-||#
 
 ;;;; Design <-> Region Equivalences
 
@@ -250,7 +284,7 @@
 ;;; foreground ink is interchangable with the everywhere region.
 ;;; By defining the following mixins and adding them to the
 ;;; appropriate ink/region class pairs, we can reduce the number
-;;; of methods necessary. 
+;;; of methods necessary.
 
 ;;;
 ;;; define these variables here so we can use them here in
@@ -261,23 +295,44 @@
 (defvar +nowhere+)
 
 (defclass everywhere-mixin () ())
-(defclass nowhere-mixin    () ()) 
+(defclass nowhere-mixin    () ())
+
+;;; The two default colors
+
+(defconstant +white+ (make-named-color "white" 1.0000 1.0000 1.0000))
+(defconstant +black+ (make-named-color "black" 0.0000 0.0000 0.0000))
+
 ;;;;
 ;;;; 13.6 Indirect Inks
 ;;;;
 
-(defclass indirect-ink (design) ())
+(defclass indirect-ink (design)
+  ((dynamic-variable-symbol :initarg :symbol  :initform (error "required"))
+   (default-ink             :initarg :default :initform (error "required"))))
+
+(defun indirect-ink-p (design)
+  (typep design 'indirect-ink))
+
+(defun indirect-ink-ink (design)
+  (check-type design indirect-ink)
+  (with-slots (dynamic-variable-symbol default-ink) design
+    (if (boundp dynamic-variable-symbol)
+        (symbol-value dynamic-variable-symbol)
+        default-ink)))
+
+(defmethod design-ink ((ink indirect-ink) x y)
+  (let ((ink (indirect-ink-ink ink)))
+    (design-ink ink x y)))
 
 (defclass %foreground-ink (indirect-ink everywhere-mixin) ())
 
-(defvar +foreground-ink+ (make-instance '%foreground-ink))
-(defvar +background-ink+ (make-instance 'indirect-ink))
+(defvar *foreground-ink*)
+(defvar +foreground-ink+
+  (make-instance '%foreground-ink :symbol '*foreground-ink* :default +black+))
 
-(defmethod print-object ((ink (eql +foreground-ink+)) stream)
-  (format stream "#.~S" '+foreground-ink+))
-
-(defmethod print-object ((ink (eql +background-ink+)) stream)
-  (format stream "#.~S" '+background-ink+))
+(defvar *background-ink*)
+(defvar +background-ink+
+  (make-instance 'indirect-ink :symbol '*background-ink* :default +white+))
 
 ;;;;
 ;;;; 13.4 Opacity
@@ -293,6 +348,10 @@
   ((value :initarg :value
           :type (real 0 1)
           :reader opacity-value)))
+
+(defmethod design-ink ((opacity standard-opacity) x y)
+  (declare (ignore x y))
+  opacity)
 
 (defclass %transparent-ink (standard-opacity nowhere-mixin)
   ()
@@ -316,6 +375,11 @@
         (t
          (make-instance 'standard-opacity :value value))))
 
+(defmethod color-rgba ((color opacity))
+  (multiple-value-call #'values
+    (color-rgb (indirect-ink-ink +foreground-ink+))
+    (opacity-value color)))
+
 ;;;;
 ;;;; 13.7 Flipping Ink
 ;;;;
@@ -326,7 +390,11 @@
    (design2 :initarg :design2
             :type design)))
 
-(defvar +flipping-ink+ (make-instance 'standard-flipping-ink 
+(defmethod design-ink ((flipping-ink standard-flipping-ink) x y)
+  (declare (ignore x y))
+  flipping-ink)
+
+(defvar +flipping-ink+ (make-instance 'standard-flipping-ink
                          :design1 +foreground-ink+
                          :design2 +background-ink+))
 
@@ -343,11 +411,11 @@
 (defmethod make-flipping-ink ((design1 design) (design2 design))
   (make-instance 'standard-flipping-ink :design1 design1 :design2 design2))
 
-(defmethod make-flipping-ink ((design1 (eql +foreground-ink+)) 
+(defmethod make-flipping-ink ((design1 (eql +foreground-ink+))
                               (design2 (eql +background-ink+)))
   +flipping-ink+)
 
-(defmethod make-flipping-ink ((design1 (eql +background-ink+)) 
+(defmethod make-flipping-ink ((design1 (eql +background-ink+))
                               (design2 (eql +foreground-ink+)))
   +flipping-ink+)
 
@@ -368,63 +436,8 @@
 (defgeneric compose-in (ink mask))
 (defgeneric compose-out (ink mask))
 
-;;; PATTERN is just the an abstract class of all pattern-like design. 
-
-;;; For performance might consider to sort out pattern, which consists
-;;; of uniform designs only and convert them to an RGBA-image.
-
-(define-protocol-class pattern (design))
-
-(defclass indexed-pattern (pattern)
-  ((array   :initarg :array :reader pattern-array)
-   (designs :initarg :designs :reader pattern-designs)))
-   
-(defun make-pattern (array designs)
-  (make-instance 'indexed-pattern :array array :designs designs))
-
-(defmethod pattern-width ((pattern indexed-pattern))
-  (array-dimension (pattern-array pattern) 1))
-
-(defmethod pattern-height ((pattern indexed-pattern))
-  (array-dimension (pattern-array pattern) 0))
-
-(defclass stencil (pattern)
-  ((array :initarg :array)))
-
-(defun make-stencil (array)
-  (make-instance 'stencil :array array))
-
-(defmethod pattern-width ((pattern stencil))
-  (with-slots (array) pattern
-    (array-dimension array 1)))
-
-(defmethod pattern-height ((pattern stencil))
-  (with-slots (array) pattern
-    (array-dimension array 0)))
-
-;;; These methods are included mostly for completeness and are likely
-;;; of little use in practice.
-(defmethod pattern-array ((pattern stencil))
-  (let ((array (make-array (list (pattern-height pattern)
-                                 (pattern-width pattern)))))
-    (dotimes (i (pattern-height pattern))
-      (dotimes (j (pattern-width pattern))
-        (setf (aref array i j) (+ (* i (array-dimension array 1)) j))))
-    array))
-
-(defmethod pattern-designs ((pattern stencil))
-  (with-slots (array) pattern
-    (let ((designs (make-array (* (pattern-height pattern)
-                                  (pattern-width pattern)))))
-      (dotimes (i (length designs))
-        (setf (aref designs i) (make-opacity (row-major-aref array i))))
-      array)))
-
-;;; The generic function MEDIUM-DRAW-PATTERN* is a McCLIM invention,
-;;; and it does not appear in the CLIM II specification.  It is called
-;;; by DRAW-PATTERN*.  
-(defgeneric medium-draw-pattern* (medium pattern x y))
-
+;;;
+;;; For patterns look in pattern.lisp
 
 ;;;
 
@@ -436,28 +449,50 @@
     :initarg :design
     :reader transformed-design-design)))
 
+;;; This may be cached in a transformed-design slot. -- jd 2018-09-24
+(defun effective-transformed-design (design &aux source-design)
+  "Merges all transformations along the way and returns a shallow, transformed
+desgin. If design is not transformed (or effective transformation is an
+identity-transformation) then source design is returned."
+  (check-type design design)
+  (labels ((effective-transformation (p)
+             (let* ((design* (transformed-design-design p))
+                    (transformation (transformed-design-transformation p)))
+               (typecase design*
+                 (transformed-design
+                  (compose-transformations transformation
+                                           (effective-transformation design*)))
+                 (otherwise
+                  (setf source-design design*)
+                  transformation)))))
+    (typecase design
+      (transformed-design
+       (if (identity-transformation-p (transformed-design-transformation design))
+           (effective-transformed-design (transformed-design-design design))
+           (make-instance (type-of design)
+                          ;; Argument order matters: EFFECTIVE-TRANSFORMATION
+                          ;; sets SOURCE-DESIGN.
+                          :transformation (effective-transformation design)
+                          :design source-design)))
+      (otherwise design))))
+
+(defmethod transform-region :around (transformation (design design))
+  (if (or (identity-transformation-p transformation)
+          (typep design '(or color opacity uniform-compositum standard-flipping-ink indirect-ink)))
+      design
+      (call-next-method)))
+
 (defmethod transform-region (transformation (design design))
-  (make-instance 'transformed-design
-                 :transformation transformation
-                 :design design))
+  (let ((old-transformation (transformed-design-transformation design)))
+    (if (and (translation-transformation-p transformation)
+             (translation-transformation-p old-transformation))
+        (make-instance 'transformed-design
+                       :design (transformed-design-design design)
+                       :transformation (compose-transformations old-transformation transformation))
+        (make-instance 'transformed-design :design design :transformation transformation))))
 
-(defmethod transform-region (transformation (design pattern))
-  (make-instance 'transformed-design
-                 :transformation transformation
-                 :design design))
-
-;;;
-
-(defclass rectangular-tile (design)
-  ((width  :initarg :width      :reader rectangular-tile-width)
-   (height :initarg :height     :reader rectangular-tile-height)
-   (design :initarg :design     :reader rectangular-tile-design)))
-
-(defun make-rectangular-tile (design width height)
-  (make-instance 'rectangular-tile
-    :width  width
-    :height height
-    :design design))
+(defmethod transformed-design-transformation ((design design)) +identity-transformation+)
+(defmethod transformed-design-design ((design design)) design)
 
 ;;;
 
@@ -466,7 +501,7 @@
    (mask :initarg :mask :reader compositum-mask)))
 
 (defmethod print-object ((object masked-compositum) stream)
-  (print-unreadable-object (object stream :identity nil :type t)    
+  (print-unreadable-object (object stream :identity nil :type t)
     (format stream "~S ~S ~S ~S"
             :ink  (compositum-ink object)
             :mask (compositum-mask object))))
@@ -494,9 +529,28 @@
     :foreground foreground
     :background background))
 
+;;; Inefficient fallback method.
+;;; FIXME we forward-reference %rgba-value.
+(defmethod design-ink ((ink over-compositum) x y)
+  (let ((fg (design-ink (compositum-foreground ink) x y))
+        (bg (design-ink (compositum-background ink) x y)))
+    (multiple-value-bind (r g b o)
+        (multiple-value-call #'color-blend-function
+          (color-rgba fg)
+          (color-rgba bg))
+      (make-uniform-compositum (make-rgb-color r g b) o)) ))
+
 (defclass uniform-compositum (in-compositum)
   ;; we use this class to represent rgbo values
   ())
+
+(defmethod color-rgba ((color uniform-compositum))
+  (with-slots (ink mask) color
+    (multiple-value-call #'values (color-rgb ink) (opacity-value mask))))
+
+(defmethod design-ink ((compositum uniform-compositum) x y)
+  (declare (ignore x y))
+  compositum)
 
 ;;;
 ;;; color
@@ -900,11 +954,6 @@
       (and (= r1 r2)
 	   (= g1 g2)
 	   (= b1 b2)))))
-
-;;; The two default colors
-
-(defconstant +white+ (make-named-color "white" 1.0000 1.0000 1.0000))
-(defconstant +black+ (make-named-color "black" 0.0000 0.0000 0.0000))
 
 ;;; Color utilities
 

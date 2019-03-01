@@ -66,10 +66,9 @@
   ())
 
 (defmethod initialize-instance :after
-    ((sheet permanent-medium-sheet-output-mixin) &rest args)
-  (declare (ignore args))
+    ((sheet permanent-medium-sheet-output-mixin) &key port)
   ;; hmm, 
-  (setf (%sheet-medium sheet) (make-medium (port sheet) sheet))
+  (setf (%sheet-medium sheet) (make-medium port sheet))
   ;; hmm...
   (engraft-medium (sheet-medium sheet) (port sheet) sheet))
 
@@ -137,9 +136,3 @@
                   (funcall continuation new-medium))
              (setf (%sheet-medium sheet) old-medium)
              (degraft-medium new-medium (port sheet) sheet) )))))
-
-(defmethod invoke-with-special-choices
-    (continuation (sheet sheet-with-medium-mixin))
-  (with-sheet-medium (medium sheet)
-    (with-special-choices (medium)
-      (funcall continuation sheet))))
