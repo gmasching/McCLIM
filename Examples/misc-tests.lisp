@@ -41,7 +41,7 @@
   ()
   (:panes
    (output :application-pane)
-   (description :application-pane)
+   (description :application-pane :end-of-line-action :wrap*)
    (selector :list-pane
              :mode :exclusive
              :name-key #'misc-test-name
@@ -55,7 +55,8 @@
                  (window-clear output)
                  (window-clear description)
                  (with-text-style (description (make-text-style :sans-serif :roman :normal))
-                   (write-string (misc-test-description item) description))
+                   (write-string (misc-test-description item) description)
+                   (finish-output description))
                  (funcall (misc-test-drawer item) output)))))
   (:layouts
    (default
@@ -358,6 +359,98 @@
                (with-translation (stream 430 430) (polygon bg)))))
       (with-drawing-options (stream :line-thickness 3) (draw-things t))
       (with-drawing-options (stream :ink +red+)        (draw-things nil)))))
+
+(defparameter *lorem-ipsum*
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed venenatis volutpat lorem. Etiam molestie ac mi vel imperdiet. Aenean vehicula purus quis purus ultricies blandit. Proin eu molestie elit. Fusce interdum ac lectus id iaculis. Pellentesque porttitor eu mauris eu tempor. In nisl nunc, fringilla vitae fermentum et, pharetra et nibh. Vivamus nisi libero, mattis at enim semper, tristique dapibus ante. Pellentesque semper mi vel risus accumsan condimentum. Donec tellus nibh, egestas ut dignissim in, mollis non ligula. Sed condimentum commodo felis, ac iaculis tellus rutrum nec. Donec cursus viverra sodales. Donec at mauris et justo dapibus iaculis. Donec nec lectus leo. Sed ante enim, ultricies vel convallis sed, hendrerit vitae nisl. Interdum et malesuada fames ac ante ipsum primis in faucibus.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed venenatis volutpat lorem. Etiam molestie ac mi vel imperdiet. Aenean vehicula purus quis purus ultricies blandit. Proin eu molestie elit. Fusce interdum ac lectus id iaculis. Pellentesque porttitor eu mauris eu tempor. In nisl nunc, fringilla vitae fermentum et, pharetra et nibh. Vivamus nisi libero, mattis at enim semper, tristique dapibus ante. Pellentesque semper mi vel risus accumsan condimentum. Donec tellus nibh, egestas ut dignissim in, mollis non ligula. Sed condimentum commodo felis, ac iaculis tellus rutrum nec. Donec cursus viverra sodales. Donec at mauris et justo dapibus iaculis. Donec nec lectus leo. Sed ante enim, ultricies vel convallis sed, hendrerit vitae nisl. Interdum et malesuada fames ac ante ipsum primis in faucibus.")
+
+(defun print-line-number ()
+  (let ((counter 0))
+    (lambda (stream soft-newline-p)
+      (if soft-newline-p
+          (with-drawing-options (stream :ink +dark-red+)
+            (format stream "~4,'0d: " counter))
+          (format stream "~4,'0d: " counter))
+      (incf counter))))
+
+(define-misc-test "Text Formatting" (stream)
+    "First case uses INDENTING-OUTPUT
+Second case uses FILLING-OUTPUT,
+Third case uses INDENTING-OUTPUT over FILLING-OUTPUT,
+Fourth case FILLING-OUTPUT over INDENTING-OUTPUT,
+Fifth case is a nested mix of two above."
+  (indenting-output (stream 20)
+    (fresh-line stream)
+    (format stream *lorem-ipsum*))
+  (terpri stream)
+  (terpri stream)
+  (filling-output (stream  :fill-width '(40 :character)
+                           :break-characters '(#\space)
+                           :after-line-break "Line: "
+                           :after-line-break-initially t)
+    (format stream *lorem-ipsum*))
+  (terpri stream)
+  (terpri stream)
+  (with-drawing-options (stream :text-style (make-text-style :fix :italic :normal)
+                                :ink +dark-blue+)
+    (indenting-output (stream 20)
+      (fresh-line stream)
+      (filling-output (stream  :fill-width '(40 :character)
+                               :break-characters '(#\space)
+                               :after-line-break (print-line-number)
+                               :after-line-break-initially t)
+        (with-drawing-options (stream :text-style *default-text-style* :ink +black+)
+          (format stream *lorem-ipsum*)))))
+  (terpri stream)
+  (terpri stream)
+  (with-drawing-options (stream :text-style (make-text-style :fix :italic :normal)
+                                :ink +dark-blue+)
+    (filling-output (stream :break-characters '(#\space)
+                            :after-line-break (print-line-number)
+                            :after-line-break-initially t
+                            :after-line-break-subsequent nil)
+      (indenting-output (stream 20)
+        (with-drawing-options (stream :text-style *default-text-style* :ink +black+)
+          (format stream *lorem-ipsum*)))))
+  (terpri stream)
+  (terpri stream)
+  (with-drawing-options (stream :text-style (make-text-style :fix :italic :normal)
+                                :ink +dark-blue+)
+    (indenting-output (stream 20)
+      (fresh-line stream)
+      (filling-output (stream  :fill-width '(60 :character)
+                               :break-characters '(#\space)
+                               :after-line-break (print-line-number)
+                               :after-line-break-initially t)
+        (with-drawing-options (stream :text-style *default-text-style* :ink +black+)
+          (format stream *lorem-ipsum*))
+        (indenting-output (stream 20)
+          (with-drawing-options (stream :ink +dark-red+)
+           (filling-output (stream :fill-width '(80 :character)
+                                   :break-characters '(#\space)
+                                   :after-line-break "| "
+                                   :after-line-break-composed nil
+                                   :after-line-break-initially t
+                                   :after-line-break-subsequent t)
+             (fresh-line stream)
+             (with-drawing-options (stream :text-style *default-text-style* :ink +dark-blue+)
+               (format stream *lorem-ipsum*)))))
+        (fresh-line stream)
+        (with-drawing-options (stream :text-style *default-text-style* :ink +black+)
+          (format stream *lorem-ipsum*))
+        (indenting-output (stream '(10 :character))
+          (with-drawing-options (stream :ink +dark-green+)
+            (filling-output (stream :fill-width '(80 :character)
+                                    :break-characters '(#\space)
+                                    :after-line-break "| "
+                                    :after-line-break-composed t
+                                    :after-line-break-initially t
+                                    :after-line-break-subsequent t)
+              (fresh-line stream)
+              (with-drawing-options (stream :text-style *default-text-style* :ink +dark-blue+)
+                (format stream *lorem-ipsum*)))))
+        (with-drawing-options (stream :text-style *default-text-style* :ink +black+)
+          (format stream *lorem-ipsum*))))))
 
 (defun misc-tests ()
   (let ((frame (make-application-frame 'misc-tests)))
