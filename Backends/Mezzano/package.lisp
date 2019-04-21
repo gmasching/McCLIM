@@ -4,7 +4,7 @@
 
 (defpackage :clim-mezzano
     (:use :clim :clim-lisp :clim-backend :mcclim-render-extensions)
-  (:import-from :climi
+    (:import-from :climi
                 #:+alt-key+
                 ;;
                 #:port-text-style-mappings
@@ -44,7 +44,6 @@
                 #:coordinate=
                 #:get-transformation
                 ;;
-                #:invoke-with-special-choices
                 #:medium-miter-limit
                 ;; classes:
                 #:mirrored-pixmap
@@ -54,6 +53,8 @@
                 #:device-font-text-style
                 ;;
 		#:make-medium
+                #:standard-event-port-mixin
+		#:standard-port
                 )
   (:import-from :mcclim-render-internals
                   #:%create-mirror-image
@@ -66,12 +67,7 @@
                   #:image-pixmap-mixin
                   #:image-mirror-mixin
                   #:opticl-rgb-image-pixels
-		  )
-  (:import-from :clim-standard
-                #:standard-event-port-mixin
-		#:standard-port
-		)
-  )
+		  ))
 
 ;; Mezzano OS interface package. All of the Mezzano symbols used by
 ;; the mezzano backend are in this package and all the symbols are

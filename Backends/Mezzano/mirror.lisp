@@ -12,7 +12,7 @@
    (width      :initform 0)
    (height     :initform 0)
    (dx         :initform 0)
-   (dy         :initfomr 0)
+   (dy         :initform 0)
    (mez-pixels :initform nil)
    (mez-window :initform nil)
    (mez-frame  :initform nil)
@@ -51,12 +51,12 @@
   (when mez-window
     ;; (debug-format "image-mirror-put ~S ~S ~S ~S ~S"
     ;;               mez-window dx dy width height)
-    ;; (mos:damage-window
-    ;;  mez-window
-    ;;  dx
-    ;;  dy
-    ;;  width
-    ;;  height)
+    #+nil (mos:damage-window
+     mez-window
+     dx
+     dy
+     width
+     height)
     (map-over-region-set-regions
      #'(lambda (region)
          (clim:with-bounding-rectangle* (min-x min-y max-x max-y)
@@ -77,27 +77,24 @@
      dirty-r)
     ))
 
-(declaim (inline mez-pixels-data-set-pixel))
-(defun mez-pixels-data-set-pixel (data x y red green blue)
-  (setf (aref data y x)
-	(dpb blue (byte 8 0)
-	     (dpb green (byte 8 8)
-		  (dpb red (byte 8 16) #xFF000000)))))
-
 (defun image-mirror-pre-put (mirror mez-pixels dx dy width height dirty-r)
-  (let ((pixels (image-pixels (image-mirror-image mirror))))
-    (declare (type opticl-rgb-image-pixels pixels))
+  (let ((pixels (climi::pattern-array (image-mirror-image mirror))))
+    (declare (type opticl-rgb-image-pixels pixels)
+             (optimize speed (safety 0) (debug 0)))
     (map-over-region-set-regions
      #'(lambda (region)
          (clim:with-bounding-rectangle* (min-x min-y max-x max-y)
            (region-intersection region (make-rectangle* 0 0
                                                         (1- width) (1- height)))
            (when mez-pixels
-             (opticl:do-region-pixels (y x min-y min-x (1+ max-y) (1+ max-x))
-               pixels
-               (multiple-value-bind (red green blue)
-                   (opticl:pixel pixels y x)
-                 (mez-pixels-data-set-pixel mez-pixels (+ dx x) (+ dy y) red green blue))))))
+             (do ((x min-x)
+                  (y min-y (1+ y)))
+                 ((> x max-x))
+               (setf (aref mez-pixels (+ dy y) (+ dx x))
+                     (logior #xFF000000 (ash (aref pixels y x) -8)))
+               (when (= y max-y)
+                 (incf x)
+                 (setf y min-y))))))
      dirty-r)))
 
 (defmethod image-mirror-to-mezzano ((sheet mezzano-mirror))

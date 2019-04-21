@@ -223,6 +223,8 @@
       (setf (mos:activep mez-frame)
             (mos:state event))
       (mos:draw-frame mez-frame)
+      ;; HACK: This "fixes" the initial rendering issue in the listener.
+      (sleep 0.1)
       (mos:fifo-push
        (with-slots (width height) mez-mirror
          (make-instance 'window-repaint-event
@@ -236,9 +238,8 @@
          (sheet (port-lookup-sheet *port* mez-window)))
     (when sheet
       (mos:fifo-push
-       (make-instance 'window-destroy-event
-                      :sheet sheet
-                      :region nil)
+       (make-instance 'window-manager-delete-event
+                      :sheet sheet)
        mcclim-fifo
        nil))))
 
@@ -275,7 +276,6 @@
                 (slot-value mez-mirror 'fheight) fheight
                 (slot-value mez-mirror 'width) width
                 (slot-value mez-mirror 'height) height)
-
           (mos:fifo-push
            (make-instance 'window-configuration-event
                           :sheet sheet

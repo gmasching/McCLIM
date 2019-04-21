@@ -11,14 +11,14 @@
   (declare (ignore requestor time)))
 
 (defmethod clim-backend:selection-owner ((port mezzano-port))
-  (clim-standard::port-selection-owner port))
+  (climi::port-selection-owner port))
 
 (defmethod (setf clim-backend:selection-owner) (owner (port mezzano-port))
-  (setf (clim-standard::port-selection-owner port) owner))
+  (setf (climi::port-selection-owner port) owner))
 
 (defmethod clim-backend::selection-requester ((port mezzano-port))
-  (clim-standard::port-selection-requester port))
+  (climi::port-selection-requester port))
 
 (defmethod (setf clim-backend::selection-requester)
     (requester (port mezzano-port))
-  (setf (clim-standard::port-selection-requester port) requester))
+  (setf (climi::port-selection-requester port) requester))

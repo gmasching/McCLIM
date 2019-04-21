@@ -85,12 +85,14 @@
   (when clim-sys:*multiprocessing-p*
     (mos:make-thread
      (lambda ()
-       (loop
-          (with-simple-restart
-              (restart-event-loop
-               "Restart CLIM's event loop.")
-            (loop
-               (process-next-event port)))))
+       (let ((*terminal-io* (make-instance 'mezzano.gui.popup-io-stream:popup-io-stream
+                                           :title "McCLIM event loop console")))
+         (loop
+            (with-simple-restart
+                (restart-event-loop
+                 "Restart CLIM's event loop.")
+              (loop
+                 (process-next-event port))))))
      :name "McCLIM Events")))
 
 (defmethod initialize-instance :after ((port mezzano-port) &rest args)
@@ -98,9 +100,7 @@
   (setf *port* port
         (slot-value port 'pointer) (make-instance 'mezzano-pointer :port port)
         (mezzano-port-window port) (mos:current-framebuffer))
-  (push (apply #'make-instance 'mezzano-frame-manager
-               :port port
-               (cdr (port-server-path port)))
+  (push (make-instance 'mezzano-frame-manager :port port)
 	(slot-value port 'frame-managers))
   (make-graft port)
   (clim-extensions:port-all-font-families port)
@@ -305,6 +305,11 @@
     (break))
   )
 
-(defmethod mcclim-render-internals::%set-image-region (mirror region)
-  (debug-format "mcclim-render-internals::%set-image-region (mirror region)")
-  (debug-format "    ~S ~S" mirror region))
+;; TODO: Theses should show/hide the window, but that needs compositor support.
+;; They're stubbed out because the listener requires them.
+
+(defmethod port-enable-sheet ((port mezzano-port) (mirror mirrored-sheet-mixin))
+  nil)
+
+(defmethod port-disable-sheet ((port mezzano-port) (mirror mirrored-sheet-mixin))
+  nil)
