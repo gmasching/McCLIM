@@ -43,4 +43,6 @@
   (stub "mouse-button-change"))
 
 (defclass mos:window () ())
+
+(defmethod )
 ;;;;<PORTING SHIM>
