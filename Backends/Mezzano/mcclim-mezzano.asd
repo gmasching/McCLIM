@@ -2,4 +2,6 @@
     :depends-on (#:mcclim-backend-common
                  #:mcclim-render)
     :components
-    ((:file "mcclim-mezzano")))
+    ((:file "package")
+     (:file "impl")
+     (:file "mcclim-mezzano")))
