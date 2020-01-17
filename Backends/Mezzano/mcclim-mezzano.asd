@@ -1,5 +1,4 @@
-
-(defsystem #:mcclim-mezzano
+(asdf:defsystem #:mcclim-mezzano
     :depends-on (#:mcclim-backend-common
                  #:mcclim-render)
     :serial t
