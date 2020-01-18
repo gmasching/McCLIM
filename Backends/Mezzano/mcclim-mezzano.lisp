@@ -458,7 +458,11 @@
   (gethash mez-window (slot-value port 'mez-window->mirror)))
 
 (defun parse-mezzano-server-path (path)
-  (let ((mirroring (mirror-factory (getf path :mirroring)))
+  (let ((mirroring (mirror-factory (getf
+				    #+nil ;;[MCCLIM]
+				    path
+				    (cdr path)
+				    :mirroring)))
         (result (list :mezzano
                       :host       :mezzano
                       :display-id 0

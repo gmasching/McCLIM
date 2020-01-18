@@ -67,8 +67,9 @@ interface management system."
 ;;; platform.
 (defsystem #:mcclim/looks
   :depends-on (#:clim
-               #-mezzano #:mcclim-clx                                 #| raw clim-clx backend |#
-               #-mezzano #:mcclim-clx/truetype                        #| adds truetype        |#
+	       #:mcclim-mezzano
+               ;;#-mezzano #:mcclim-clx                                 #| raw clim-clx backend |#
+               ;;#-mezzano #:mcclim-clx/truetype                        #| adds truetype        |#
                #+mcclim-ffi-freetype #:mcclim-clx/freetype  #| adds freetype        |#
                ;;#-mezzano #:mcclim-clx-fb                              #| experimental backend |#
                #+mezzano #:mcclim-mezzano                   #| Mezzano (a LISP OS)  |#
