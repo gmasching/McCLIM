@@ -78,12 +78,12 @@
 
 (defpackage :clim-mezzano-os
   (:nicknames #:mos)
-  #+nil
   (:use :mezzano.supervisor
         :mezzano.gui
         :mezzano.gui.compositor
         :mezzano.gui.widgets
-	:mezzano.gui.popup-io-stream)
+	;;:mezzano.gui.popup-io-stream
+	)
 
   ;; from mezzano.gui
   (:export ;;#:clamp
@@ -217,6 +217,7 @@
            #:framebuffer-height ;
            )
   ;; from mezzano.gui.popup-io-stream
+  #+nil ;;[MCCLIM]
   (:export #:popup-io-stream)
   )
 ;;;;</PACKAGE>

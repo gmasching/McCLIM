@@ -112,6 +112,9 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
 
 (defun colour-matrix-element (colour-matrix row col)
   (aref (colour-matrix-elements colour-matrix) (+ (* row 4) col)))
+;;[MCCLIM]
+(deftype matrix4 ()
+  '(simple-array single-float (16)))
 #+nil;;[MCCLIM]
 #+x86-64
 (progn
@@ -324,3 +327,54 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
   (assert (typep colour 'colour))
   (%colour-matrix-multiply (colour-matrix-elements colour-matrix) colour))
 )
+;;argb -> rgb ->argb
+;;
+;;[MCCLIM]
+(defun unpack (color)
+  (values
+   (ldb +colour-alpha-bits+ color)
+   (ldb +colour-red-bits+ color)
+   (ldb +colour-green-bits+ color)
+   (ldb +colour-blue-bits+ color)
+   ))
+(defun pack (a r g b)
+  (dpb a +colour-alpha-bits+
+       (dpb r +colour-red-bits+
+	    (dpb g +colour-green-bits+
+		 (dpb b +colour-blue-bits+ 0)))))
+
+(defun floatify (x)
+  (float x 1.0))
+(defun byte-frac (n)
+  (* n (/ 1.0 255.0)))
+(defun frac-byte (n)
+  (floor (* n 255.0)))
+(defun %colour-matrix-multiply (matrix colour)
+  (multiple-value-bind (a r g b) (unpack colour)
+    (declare (ignorable a))
+    (let* ((point (sb-cga:vec (byte-frac r) (byte-frac g) (byte-frac b)))
+	   (transformed-point
+	    (sb-cga:transform-point point matrix)))
+      ;;(print (list point transformed-point))
+      (pack (frac-byte 1.0)
+	    (frac-byte (aref transformed-point 0))
+	    (frac-byte (aref transformed-point 1))
+	    (frac-byte (aref transformed-point 2))))))
+
+(defun invariant ()
+  (let ((y (pack 255 (random 255) (random 255) (random 255)))
+	(m (sb-cga:identity-matrix)))
+    (print (list y (%colour-matrix-multiply m y)))))
+
+(defun invariant2 ()
+  (let ((x (random (ash 1 32))))
+    (list
+     x
+     (multiple-value-call 'pack (unpack x)))))
+
+(defun invariant3 ()
+  (let ((x (random (ash 1 32))))
+    (list
+     x
+     (byte-frac (frac-byte x))
+     (frac-byte (byte-frac x)))))

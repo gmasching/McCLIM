@@ -6,10 +6,12 @@
 ;; Line traversal functions.
 
 (defun %bitblt-line (blender to to-offset ncols from from-offset)
-  (declare (type (simple-array mezzano.gui:colour (*)) to from)
-           (type fixnum ncols to-offset from-offset)
-           (type function blender)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to from)
+   (type fixnum ncols to-offset from-offset)
+   (type function blender)
+   (optimize speed (safety 0)))
   (loop
      for i fixnum below ncols
      for to-ofs fixnum from to-offset
@@ -17,23 +19,28 @@
      do (funcall blender (aref from from-ofs) to to-ofs)))
 
 (defun %bitset-line (blender to to-offset ncols colour)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type mezzano.gui:colour colour)
-           (type fixnum ncols to-offset)
-           (type function blender)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   (type mezzano.gui:colour colour)
+   (type fixnum ncols to-offset)
+   (type function blender)
+   (optimize speed (safety 0)))
   (loop
      for i fixnum below ncols
      for to-ofs fixnum from to-offset
      do (funcall blender colour to to-ofs)))
 
 (defun %bitset-mask-1-line (blender to to-offset ncols mask mask-offset colour)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type (simple-array bit (*)) mask)
-           (type mezzano.gui:colour colour)
-           (type fixnum ncols to-offset mask-offset)
-           (type function blender)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   #+nil ;;[MCCLIM]
+   (type (simple-array bit (*)) mask)
+   (type mezzano.gui:colour colour)
+   (type fixnum ncols to-offset mask-offset)
+   (type function blender)
+   (optimize speed (safety 0)))
   (loop
      for i fixnum below ncols
      for to-ofs fixnum from to-offset
@@ -68,12 +75,15 @@
                t))
 
 (defun %bitset-mask-8-line (blender to to-offset ncols mask mask-offset colour)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type (simple-array (unsigned-byte 8) (*)) mask)
-           (type mezzano.gui:colour colour)
-           (type fixnum ncols to-offset mask-offset)
-           (type function blender)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   #+nil ;;[MCCLIM]
+   (type (simple-array (unsigned-byte 8) (*)) mask)
+   (type mezzano.gui:colour colour)
+   (type fixnum ncols to-offset mask-offset)
+   (type function blender)
+   (optimize speed (safety 0)))
   (loop
      for i fixnum below ncols
      for to-ofs fixnum from to-offset
@@ -85,17 +95,21 @@
 ;;; Final blending functions.
 
 (defun %%set-one-argb8888-argb8888 (colour to to-offset)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type mezzano.gui:colour colour)
-           (type fixnum to-offset)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   (type mezzano.gui:colour colour)
+   (type fixnum to-offset)
+   (optimize speed (safety 0)))
   (setf (aref to to-offset) colour))
 
 (defun %%xor-one-argb8888-argb8888 (colour to to-offset)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type mezzano.gui:colour colour)
-           (type fixnum to-offset)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   (type mezzano.gui:colour colour)
+   (type fixnum to-offset)
+   (optimize speed (safety 0)))
   (setf (aref to to-offset) (logxor (aref to to-offset) colour)))
 
 ;; Alpha-blend PIXEL into DEST.
@@ -103,10 +117,12 @@
 ;; src = GL_ONE
 ;; dst = GL_ONE_MINUS_SRC_ALPHA
 (defun %%alpha-blend-one-argb8888-argb8888 (colour to to-offset)
-  (declare (type (simple-array mezzano.gui:colour (*)) to)
-           (type mezzano.gui:colour colour)
-           (type fixnum to-offset)
-           (optimize speed (safety 0)))
+  (declare
+   #+nil ;;[MCCLIM]
+   (type (simple-array mezzano.gui:colour (*)) to)
+   (type mezzano.gui:colour colour)
+   (type fixnum to-offset)
+   (optimize speed (safety 0)))
   (let* ((source-alpha (colour-alpha-as-octet colour)))
     (cond ((eql source-alpha 0)
            ;; Fully transparent, do nothing.

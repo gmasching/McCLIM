@@ -1,6 +1,11 @@
 (asdf:defsystem #:mcclim-mezzano
     :depends-on (#:mcclim-backend-common
-                 #:mcclim-render)
+                 #:mcclim-render
+		 ;;For a FIFO queue
+		 #:lparallel
+		 ;;For color multiplication
+		 #:sb-cga
+		 )
     :components
     (
      ;;(:file "mezzano")
@@ -10,12 +15,12 @@
       :serial t
       :components
       ((:file "package")
+       (:file "blit-generic")
        (:file "colour")
        (:file "blit")
-       (:file "blit-generic")
        (:file "surface")
        (:file "compositor")
        (:file "widgets")))
      (:file "package")
-     (:file "impl")
+     ;;(:file "impl")
      (:file "mcclim-mezzano")))

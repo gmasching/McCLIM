@@ -5,6 +5,13 @@
 
 (in-package :mezzano.gui)
 
+;;[MCCLIM]
+(defun array-flatten (array)
+  (make-array
+   (array-total-size array)
+   :displaced-to array
+   :element-type (array-element-type array)))
+
 (defun compute-blit-info-dest-src (nrows ncols from-array from-row from-col to-array to-row to-col)
   "Clamp parameters to array boundaries, return the stride of both arrays and their undisplaced, non-complex base arrays."
   (let ((from-width (array-dimension from-array 1))
@@ -54,14 +61,18 @@
     (incf from-offset (+ (* from-row from-width) from-col))
     (incf to-offset (+ (* to-row to-width) to-col))
     (values nrows ncols
-            (if (mezzano.internals::%simple-1d-array-p from-array)
-                from-array
-                (mezzano.internals::%complex-array-storage from-array))
-            from-offset from-width
-            (if (mezzano.internals::%simple-1d-array-p to-array)
-                to-array
-                (mezzano.internals::%complex-array-storage to-array))
-            to-offset to-width)))
+	    (array-flatten from-array)
+	    #+nil ;;[MCCLIM]
+	    (if (mezzano.internals::%simple-1d-array-p from-array)
+		from-array
+		(mezzano.internals::%complex-array-storage from-array))
+	    from-offset from-width
+	    (array-flatten to-array)
+	    #+nil ;;[MCCLIM]
+	    (if (mezzano.internals::%simple-1d-array-p to-array)
+		to-array
+		(mezzano.internals::%complex-array-storage to-array))
+	    to-offset to-width)))
 
 (defun compute-blit-info-dest (nrows ncols to-array to-row to-col)
   "Clamp parameters to array boundaries, return the stride of the array and its undisplaced, non-complex base array."
@@ -90,6 +101,8 @@
               to-offset to-displaced-offset)))
     (incf to-offset (+ (* to-row to-width) to-col))
     (values nrows ncols
+	    (array-flatten to-array)
+	    #+nil ;;[MCCLIM]
             (if (mezzano.internals::%simple-1d-array-p to-array)
                 to-array
                 (mezzano.internals::%complex-array-storage to-array))

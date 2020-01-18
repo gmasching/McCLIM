@@ -165,6 +165,7 @@
 (defun set-frame-draw-enables (frame)
   (let ((top-border (top-border frame))
         (win-width (mezzano.gui:surface-width (framebuffer frame)))
+	#+nil ;;[MCCLIM]
         (title (frame-title frame)))
     (setf (draw-corners-p frame)
           (and (>= top-border (array-dimension *corner-mask* 0))
@@ -177,8 +178,11 @@
           (close-vert frame)
           (truncate (/ (- top-border (mezzano.gui:surface-height *close-button*))
                        2))
+	  #+nil ;;[MCCLIM]
           (draw-title-p frame)
-          (and title (>= top-border (+ 4 (line-height *frame-title-font*)))))
+	  #+nil ;;[MCCLIM]
+	  (and title (>= top-border (+ 4 (line-height *frame-title-font*)))))
+    #+nil ;;[MCCLIM]
     (when (draw-title-p frame)
       (let ((width 0))
         ;; Compute title width and height
@@ -245,6 +249,7 @@
                           (if (close-button-hover frame) *close-button-hover* *close-button*)
                           0 0
                           framebuffer *close-button-x* (close-vert frame)))
+    #+nil ;;[MCCLIM]
     (when (draw-title-p frame)
       ;; Title.
       (let ((title (frame-title frame))

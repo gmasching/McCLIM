@@ -795,8 +795,10 @@
 
 (defun image-mirror-pre-put (mirror mez-pixels dx dy width height dirty-r)
   (let ((pixels (climi::pattern-array (image-mirror-image mirror))))
-    (declare (type opticl-rgb-image-pixels pixels)
-             (optimize speed (safety 0) (debug 0)))
+    (declare
+     #+nil ;;[MCCLIM]
+     (type opticl-rgb-image-pixels pixels)
+     (optimize speed (safety 0) (debug 0)))
     (map-over-region-set-regions
      #'(lambda (region)
          (clim:with-bounding-rectangle* (min-x min-y max-x max-y)
