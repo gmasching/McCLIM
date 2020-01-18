@@ -15,7 +15,9 @@
         (t x)))
 
 (defvar *compositor* nil "Compositor thread.")
-(defvar *compositor-debug-enable* nil)
+(defvar *compositor-debug-enable*
+  ;;nil
+  t)
 
 (defvar *event-queue*
   ;;nil

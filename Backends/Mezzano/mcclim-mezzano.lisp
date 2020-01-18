@@ -186,6 +186,7 @@
          (mouse-y    (mos:mouse-y-position event))
          (mez-mirror (port-lookup-mirror *port* mez-window))
          (sheet      (port-lookup-sheet *port* mez-window)))
+    ;;(print (list mez-window mez-mirror sheet))
     (when mez-mirror
       (with-slots (mez-frame dx dy width height) mez-mirror
         (setf *last-mouse-x* (- mouse-x dx)
@@ -457,6 +458,20 @@
 (defmethod port-lookup-mirror ((port mezzano-port) (mez-window mos:window))
   (gethash mez-window (slot-value port 'mez-window->mirror)))
 
+;;[MCCLIM FIXME] duplicate of code above. change mos:windows
+;;to mezzano.supervisor:framebuffer-blit
+#+nil
+(defmethod port-lookup-sheet ((port mezzano-port)
+			      (mez-window mezzano.supervisor::framebuffer))
+  (let ((hash (slot-value port 'mez-window->sheet)))
+    ;;(maphash (lambda (&rest rest) (print rest)) hash)
+    (gethash mez-window hash)))
+#+nil
+(defmethod port-lookup-mirror ((port mezzano-port)
+			       (mez-window mezzano.supervisor::framebuffer))
+  (let ((hash (slot-value port 'mez-window->mirror)))
+    (gethash mez-window hash)))
+
 (defun parse-mezzano-server-path (path)
   (let ((mirroring (mirror-factory (getf
 				    #+nil ;;[MCCLIM]
@@ -640,6 +655,8 @@
 
 ;; return :timeout on timeout
 ;;
+
+(defparameter *what* nil)
 (defmethod get-next-event ((port mezzano-port) &key wait-function (timeout nil))
   (declare (ignore wait-function))
   (let ((mez-fifo (mezzano-mez-fifo port))
@@ -659,17 +676,8 @@
         ;; event. It works accidently because the only mcclim event it
         ;; ignores is a keyboard-event which only occurs singlely in
         ;; the mcclim-fifo.
-        (loop
-           (multiple-value-bind (event validp)
-               (mos:fifo-pop mcclim-fifo nil)
-             (when validp
-               ;; ignore keyboard events if there's no event sheet to
-               ;; handle them
-               (unless (and (typep event 'keyboard-event)
-                            (null (event-sheet event)))
-                 (return event))))
-           (mez-event->mcclim-event
-            mcclim-fifo (mos:fifo-pop mez-fifo t)))
+	(catch 'out
+	  (loop (event-per-frame mcclim-fifo mez-fifo)))
         (mos:panic "timeout not supported")
         ;; (loop
         ;;    (multiple-value-bind (event validp)
@@ -679,6 +687,26 @@
         ;;            (T (sleep 0.01)
         ;;               (decf timeout 0.01)))))
         )))
+;;[MCCLIM]
+(defun event-per-frame (mcclim-fifo mez-fifo)
+  (sleep 0.09) ;;So it doesnt keep spinning
+  ;;(print 1)
+  (multiple-value-bind (event validp) (mos:fifo-pop mcclim-fifo nil)
+    (when validp
+      (print event)
+      ;; ignore keyboard events if there's no event sheet to
+      ;; handle them
+      (unless (and (typep event 'keyboard-event)
+		   (null (event-sheet event)))
+	(throw 'out event))))
+  (multiple-value-bind (event validp)
+      (mos:fifo-pop mez-fifo
+		    nil
+		    ;;t
+		    )
+    (when validp
+      ;;(print event)
+      (mez-event->mcclim-event mcclim-fifo event))))
 
 ;;; Pixmap
 

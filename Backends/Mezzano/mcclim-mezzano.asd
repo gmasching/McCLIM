@@ -22,5 +22,4 @@
        (:file "compositor")
        (:file "widgets")))
      (:file "package")
-     ;;(:file "impl")
      (:file "mcclim-mezzano")))
