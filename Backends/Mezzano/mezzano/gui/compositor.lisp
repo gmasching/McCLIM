@@ -18,8 +18,8 @@
 (defvar *compositor-debug-enable* nil)
 
 (defvar *event-queue*
-  nil
-  #+nil ;;[MCCLIM FIXME]
+  ;;nil
+  ;;#+nil ;;[MCCLIM FIXME]
   (mezzano.sync:make-mailbox :name 'compositor-event-queue)
   "Internal FIFO used to submit events to the compositor.")
 

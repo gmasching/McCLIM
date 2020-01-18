@@ -1,13 +1,15 @@
 (defpackage #:mezzano.sync
+  (:use :cl)
   (:export
    #:make-mailbox
    #:mailbox-send
    #:mailbox-receive))
 
 (defpackage #:mezzano.supervisor
+  (:use :cl)
   (:export
    #:make-thread ;
-
+   #:current-thread ;[MCCLIM FIXME]
    #:debug-print-line ;
 
    #:panic ;
@@ -22,7 +24,7 @@
    ;;#:fifo-element-type
 
    #:current-framebuffer
-   ;;#:framebuffer-blit
+   #:framebuffer-blit ;[MCCLIM FIXME]
    #:framebuffer-width ;
    #:framebuffer-height ;
    ))
@@ -40,5 +42,6 @@
   )
 
 (defpackage #:mezzano.internals
+  (:use :cl)
   (:export
    #:log-and-ignore-errors))

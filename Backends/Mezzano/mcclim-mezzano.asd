@@ -8,8 +8,8 @@
 		 )
     :components
     (
-     ;;(:file "mezzano")
      (:file "mezzano-package")
+     (:file "mezzano-shim")
      (:module
       "mezzano/gui"
       :serial t

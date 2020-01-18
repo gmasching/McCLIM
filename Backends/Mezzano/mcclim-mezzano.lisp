@@ -1,3 +1,7 @@
+(in-package :clim-mezzano)
+;;Taken from the top of the "<PORT>" section
+(defvar *port* NIL)
+
 ;;;;************************************************************************;;;;
 ;;;;<EVENTS>
 (in-package :clim-mezzano)
@@ -100,6 +104,7 @@
     result))
 
 (defun pointer-motion-event (mcclim-fifo sheet event)
+  (declare (ignorable event)) ;; [MCCLIM FIXME]
   (let ((time 0))
     (mos:fifo-push
      (make-instance 'pointer-motion-event
@@ -135,6 +140,7 @@
      nil)))
 
 (defun mouse-exit-event (mcclim-fifo sheet event)
+  (declare (ignorable event)) ;; [MCCLIM FIXME]
   (let ((time 0))
     (mos:fifo-push
     (make-instance 'pointer-exit-event
@@ -150,6 +156,7 @@
     nil)))
 
 (defun mouse-enter-event (mcclim-fifo sheet event)
+  (declare (ignorable event)) ;; [MCCLIM FIXME]
   (let ((time 0))
     (mos:fifo-push
      (make-instance 'pointer-enter-event
@@ -220,7 +227,10 @@
          (mez-mirror (port-lookup-mirror *port* mez-window))
          (mez-frame (and mez-mirror (slot-value mez-mirror 'mez-frame)))
          (sheet (port-lookup-sheet *port* mez-window))
-         (focus (and sheet (frame-query-io (pane-frame sheet)))))
+	 ;; [MCCLIM FIXME]
+	 #+nil
+         (focus (and sheet (frame-query-io (pane-frame sheet))))
+	 )
     (when mez-frame
       (setf (mos:activep mez-frame)
             (mos:state event))
@@ -396,8 +406,6 @@
 ;;;;<PORT>
 (in-package :clim-mezzano)
 
-(defvar *port* NIL)
-
 ;;======================================================================
 ;; Define pointer class
 ;;======================================================================
@@ -469,6 +477,7 @@
      (loop
         (handler-case
             (maphash #'(lambda (key val)
+			 (declare (ignore val)) ;; [MCCLIM FIXME]
                          (when (typep key 'mezzano-mirrored-sheet-mixin)
                            (image-mirror-to-mezzano (sheet-mirror key))))
                      (slot-value port 'climi::sheet->mirror))
@@ -613,6 +622,7 @@
 (defmethod port-force-output ((port mezzano-port))
   (maphash
    #'(lambda (key val)
+       (declare (ignore val)) ;; [MCCLIM FIXME]
        (when (typep key 'mezzano-mirrored-sheet-mixin)
          (mcclim-render-internals::%mirror-force-output (sheet-mirror key))))
    (slot-value port 'climi::sheet->mirror))
@@ -796,8 +806,9 @@
 (defun image-mirror-pre-put (mirror mez-pixels dx dy width height dirty-r)
   (let ((pixels (climi::pattern-array (image-mirror-image mirror))))
     (declare
-     #+nil ;;[MCCLIM]
+     #+nil ;;[MCCLIM FIXME OPTIMIZATION]
      (type opticl-rgb-image-pixels pixels)
+     #+nil ;;[MCCLIM FIXME OPTIMIZATION]
      (optimize speed (safety 0) (debug 0)))
     (map-over-region-set-regions
      #'(lambda (region)

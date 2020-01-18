@@ -349,6 +349,7 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
   (* n (/ 1.0 255.0)))
 (defun frac-byte (n)
   (floor (* n 255.0)))
+;;[MCCLIM FIXME] -> assumes r g b a format, might be wrong.
 (defun %colour-matrix-multiply (matrix colour)
   (multiple-value-bind (a r g b) (unpack colour)
     (declare (ignorable a))
