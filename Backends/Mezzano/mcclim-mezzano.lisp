@@ -481,7 +481,8 @@
   (when clim-sys:*multiprocessing-p*
     (mos:make-thread
      (lambda ()
-       (let ((*terminal-io* (make-instance 'mos:popup-io-stream
+       (let (#+nil ;;[MCCLIM]
+	     (*terminal-io* (make-instance 'mos:popup-io-stream
                                            :title "McCLIM event loop console")))
          (loop
             (with-simple-restart
