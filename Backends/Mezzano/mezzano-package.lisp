@@ -45,3 +45,6 @@
   (:use :cl)
   (:export
    #:log-and-ignore-errors))
+
+(defpackage #:mezzano.gui
+  (:export #:unpack-color))

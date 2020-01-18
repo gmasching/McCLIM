@@ -129,8 +129,9 @@
 (defun 2d-array-bitblt (nrows ncols from-array from-row from-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols from from-offset from-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols from-array from-row from-col to-array to-row to-col)
-    (assert (simple-ub32-vector-p from))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p from))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitblt-line #'%%set-one-argb8888-argb8888
@@ -143,8 +144,9 @@
 (defun 2d-array-bitblt-blend (nrows ncols from-array from-row from-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols from from-offset from-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols from-array from-row from-col to-array to-row to-col)
-    (assert (simple-ub32-vector-p from))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p from))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitblt-line #'%%alpha-blend-one-argb8888-argb8888
@@ -157,8 +159,9 @@
 (defun 2d-array-bitblt-xor (nrows ncols from-array from-row from-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols from from-offset from-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols from-array from-row from-col to-array to-row to-col)
-    (assert (simple-ub32-vector-p from))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p from))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitblt-line #'%%xor-one-argb8888-argb8888
@@ -171,9 +174,10 @@
 (defun 2d-array-bitblt-matrix (colour-matrix nrows ncols from-array from-row from-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols from from-offset from-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols from-array from-row from-col to-array to-row to-col)
-    (assert (typep colour-matrix 'colour-matrix))
-    (assert (simple-ub32-vector-p from))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (typep colour-matrix 'colour-matrix))
+    ;;(assert (simple-ub32-vector-p from))
+    ;;(assert (simple-ub32-vector-p to))
     (%2d-array-bitblt-matrix
      (colour-matrix-elements colour-matrix)
      nrows ncols
@@ -208,7 +212,8 @@
 (defun 2d-array-bitset (nrows ncols colour to-array to-row to-col)
   (multiple-value-bind (nrows ncols to to-offset to-stride)
       (compute-blit-info-dest nrows ncols to-array to-row to-col)
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-line #'%%set-one-argb8888-argb8888
@@ -223,7 +228,8 @@
     (return-from 2d-array-bitset-blend (2d-array-bitset nrows ncols colour to-array to-row to-col)))
   (multiple-value-bind (nrows ncols to to-offset to-stride)
       (compute-blit-info-dest nrows ncols to-array to-row to-col)
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p to))
     (when (and (not (eql (ldb (byte 8 24) colour) 0))
                (> ncols 0))
       (dotimes (y nrows)
@@ -237,7 +243,8 @@
   "Exclusive OR a rectangle with COLOUR."
   (multiple-value-bind (nrows ncols to to-offset to-stride)
       (compute-blit-info-dest nrows ncols to-array to-row to-col)
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-line #'%%xor-one-argb8888-argb8888
@@ -249,8 +256,9 @@
 (defun 2d-array-bitset-mask-1 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub1-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub1-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-mask-1-line #'%%set-one-argb8888-argb8888
@@ -264,8 +272,9 @@
 (defun 2d-array-bitset-blend-mask-1 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub1-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub1-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (and (not (eql (ldb (byte 8 24) colour) 0))
                (> ncols 0))
       (dotimes (y nrows)
@@ -280,8 +289,9 @@
 (defun 2d-array-bitset-xor-mask-1 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub1-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub1-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-mask-1-line #'%%xor-one-argb8888-argb8888
@@ -295,8 +305,9 @@
 (defun 2d-array-bitset-mask-8 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub8-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub8-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-mask-8-line #'%%set-one-argb8888-argb8888
@@ -310,8 +321,9 @@
 (defun 2d-array-bitset-blend-mask-8 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub8-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub8-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (and (not (eql (ldb (byte 8 24) colour) 0))
                (> ncols 0))
       (dotimes (y nrows)
@@ -326,8 +338,9 @@
 (defun 2d-array-bitset-xor-mask-8 (nrows ncols colour mask-array mask-row mask-col to-array to-row to-col)
   (multiple-value-bind (nrows ncols mask mask-offset mask-stride to to-offset to-stride)
       (compute-blit-info-dest-src nrows ncols mask-array mask-row mask-col to-array to-row to-col)
-    (assert (simple-ub8-vector-p mask))
-    (assert (simple-ub32-vector-p to))
+    ;;[MCCLIM FIXME OPTIMIZATION]
+    ;;(assert (simple-ub8-vector-p mask))
+    ;;(assert (simple-ub32-vector-p to))
     (when (> ncols 0)
       (dotimes (y nrows)
         (%bitset-mask-8-line #'%%xor-one-argb8888-argb8888

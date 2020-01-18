@@ -5,7 +5,7 @@
 		 #:lparallel
 		 ;;For color multiplication
 		 #:sb-cga
-		 )
+		 #:opticl)
     :components
     (
      (:file "mezzano-package")

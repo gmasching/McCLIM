@@ -330,14 +330,14 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
 ;;argb -> rgb ->argb
 ;;
 ;;[MCCLIM]
-(defun unpack (color)
+(defun unpack-color (color)
   (values
    (ldb +colour-alpha-bits+ color)
    (ldb +colour-red-bits+ color)
    (ldb +colour-green-bits+ color)
    (ldb +colour-blue-bits+ color)
    ))
-(defun pack (a r g b)
+(defun pack-color (a r g b)
   (dpb a +colour-alpha-bits+
        (dpb r +colour-red-bits+
 	    (dpb g +colour-green-bits+
@@ -351,19 +351,20 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
   (floor (* n 255.0)))
 ;;[MCCLIM FIXME] -> assumes r g b a format, might be wrong.
 (defun %colour-matrix-multiply (matrix colour)
-  (multiple-value-bind (a r g b) (unpack colour)
+  (multiple-value-bind (a r g b) (unpack-color colour)
     (declare (ignorable a))
     (let* ((point (sb-cga:vec (byte-frac r) (byte-frac g) (byte-frac b)))
 	   (transformed-point
 	    (sb-cga:transform-point point matrix)))
       ;;(print (list point transformed-point))
-      (pack (frac-byte 1.0)
-	    (frac-byte (aref transformed-point 0))
-	    (frac-byte (aref transformed-point 1))
-	    (frac-byte (aref transformed-point 2))))))
+      (pack-color
+       (frac-byte 1.0)
+       (frac-byte (aref transformed-point 0))
+       (frac-byte (aref transformed-point 1))
+       (frac-byte (aref transformed-point 2))))))
 
 (defun invariant ()
-  (let ((y (pack 255 (random 255) (random 255) (random 255)))
+  (let ((y (pack-color 255 (random 255) (random 255) (random 255)))
 	(m (sb-cga:identity-matrix)))
     (print (list y (%colour-matrix-multiply m y)))))
 
@@ -371,7 +372,7 @@ otherwise they will be treated as straight alpha and converted to premultiplied 
   (let ((x (random (ash 1 32))))
     (list
      x
-     (multiple-value-call 'pack (unpack x)))))
+     (multiple-value-call 'pack-color (unpack-color x)))))
 
 (defun invariant3 ()
   (let ((x (random (ash 1 32))))

@@ -48,7 +48,10 @@
            #:simd-colour-elements
            #:colour-lerp
            #:colour-matrix-matrix-multiply
-           #:colour-matrix-multiply))
+           #:colour-matrix-multiply
+
+	   ;;[MCCLIM]
+	   #:unpack-color))
 
 (defpackage :mezzano.gui.compositor
   (:use :cl :mezzano.gui)
